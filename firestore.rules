@@ -65,5 +65,28 @@ service cloud.firestore {
       allow update: if isAdmin() && isValidTransaction(request.resource.data);
       allow delete: if isAdmin();
     }
+
+    match /notices/{noticeId} {
+      // All authenticated users can read notices
+      allow read: if isAuthenticated();
+      // Only admins can post, update (pin/unpin), or delete notices
+      allow create: if isAdmin() &&
+        request.resource.data.keys().hasAll(['title', 'content', 'createdBy', 'createdAt', 'isPinned']) &&
+        request.resource.data.title is string &&
+        request.resource.data.content is string;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /categories/{categoryId} {
+      // All authenticated users can read categories
+      allow read: if isAuthenticated();
+      // Only admins can add or remove categories
+      allow create: if isAdmin() &&
+        request.resource.data.keys().hasAll(['name', 'iconName', 'order']) &&
+        request.resource.data.name is string;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
   }
 }

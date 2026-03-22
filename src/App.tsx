@@ -61,6 +61,7 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, startOf
 import { BrowserRouter, Routes, Route, Link, useNavigate } from 'react-router-dom';
 import { AdminPanel } from './components/AdminPanel';
 import { InstallPWA } from './components/InstallPWA';
+import { NoticeBoard } from './components/NoticeBoard';
 import { LanguageProvider, useLanguage } from './contexts/LanguageContext';
 import { motion, AnimatePresence } from 'motion/react';
 import jsPDF from 'jspdf';
@@ -89,13 +90,13 @@ interface FlatInfo {
   role: 'admin' | 'resident';
 }
 
-const CATEGORIES = [
-  { id: 'plumbing', name: 'Plumbing', icon: Wrench },
-  { id: 'wiring', name: 'Wiring', icon: Zap },
-  { id: 'maintenance', name: 'Maintenance', icon: Building2 },
-  { id: 'security', name: 'Security', icon: Shield },
-  { id: 'cleaning', name: 'Cleaning', icon: Building2 },
-  { id: 'others', name: 'Others', icon: PlusCircle },
+const FALLBACK_CATEGORIES = [
+  { id: 'plumbing', name: 'Plumbing' },
+  { id: 'wiring', name: 'Wiring' },
+  { id: 'maintenance', name: 'Maintenance' },
+  { id: 'security', name: 'Security' },
+  { id: 'cleaning', name: 'Cleaning' },
+  { id: 'others', name: 'Others' },
 ];
 
 const PREDEFINED_USERS = [
@@ -119,6 +120,7 @@ function Dashboard() {
   const [exportMonth, setExportMonth] = useState(new Date().getMonth());
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>(FALLBACK_CATEGORIES);
 
   // Chart State
   const [chartView, setChartView] = useState<'pie' | 'line'>('pie');
@@ -178,6 +180,18 @@ function Dashboard() {
     });
     return () => unsubscribe();
   }, [user]);
+
+  // Categories Listener
+  useEffect(() => {
+    const q = query(collection(db, 'categories'), orderBy('order', 'asc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      if (!snapshot.empty) {
+        const data = snapshot.docs.map((d) => ({ id: d.id, name: (d.data() as any).name as string }));
+        setCategories(data);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Connection Test
   useEffect(() => {
@@ -367,7 +381,7 @@ function Dashboard() {
         // Expenses by category
         const expenses = filtered.filter(t => t.type === 'expense');
         const data: { name: string; value: number }[] = [];
-        CATEGORIES.forEach(cat => {
+        categories.forEach(cat => {
           const total = expenses.filter(t => t.category === cat.name).reduce((acc, t) => acc + t.amount, 0);
           if (total > 0) data.push({ name: cat.name, value: total });
         });
@@ -395,7 +409,7 @@ function Dashboard() {
       if (chartView === 'pie') {
         const expenses = filtered.filter(t => t.type === 'expense');
         const data: { name: string; value: number }[] = [];
-        CATEGORIES.forEach(cat => {
+        categories.forEach(cat => {
           const total = expenses.filter(t => t.category === cat.name).reduce((acc, t) => acc + t.amount, 0);
           if (total > 0) data.push({ name: cat.name, value: total });
         });
@@ -413,7 +427,7 @@ function Dashboard() {
         });
       }
     }
-  }, [transactions, chartView, timeRange, selectedYear, selectedMonth]);
+  }, [transactions, chartView, timeRange, selectedYear, selectedMonth, categories]);
 
   const COLORS = ['#5A5A40', '#8E8E6B', '#C2C296', '#E6E6D1', '#A3A375', '#70704F'];
 
@@ -602,6 +616,14 @@ function Dashboard() {
             </>
           )}
         </div>
+
+        {/* Notice Board */}
+        {flatInfo && (
+          <NoticeBoard
+            isAdmin={flatInfo.role === 'admin'}
+            flatNo={flatInfo.flatNo}
+          />
+        )}
 
         {/* Actions & List */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -972,7 +994,7 @@ function Dashboard() {
                       required
                       className="w-full px-4 py-3 bg-[#F5F5F0] border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40]/20 outline-none appearance-none"
                     >
-                      {CATEGORIES.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                      {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                     </select>
                   </div>
                 </div>
