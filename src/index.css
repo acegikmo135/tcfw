@@ -5,3 +5,7 @@
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-serif: "Cormorant Garamond", serif;
 }
+
+#replit-badge-container {
+  display: none !important;
+}
