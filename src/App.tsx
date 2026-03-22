@@ -812,6 +812,10 @@ function Dashboard() {
           )}
         </div>
 
+        <div className="flex justify-center">
+          <InstallPWA />
+        </div>
+
         {/* Notices Section */}
         {notices.length > 0 && (
           <div className="bg-white p-6 rounded-[32px] shadow-sm border border-[#5A5A40]/10 relative overflow-hidden">

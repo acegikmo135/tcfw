@@ -433,20 +433,6 @@ export function AdminPanel() {
           </button>
         </div>
 
-        <div className="flex items-center justify-between mb-8 mt-12 border-t border-black/5 pt-12">
-          <div>
-            <h2 className="text-3xl font-serif">Categories</h2>
-            <p className="text-[#5A5A40]/60 text-sm">Manage transaction categories</p>
-          </div>
-          <button 
-            onClick={() => setIsManagingCategories(true)}
-            className="bg-[#5A5A40] text-white px-6 py-3 rounded-full font-medium flex items-center gap-2 hover:bg-[#4A4A30] transition-all shadow-lg shadow-[#5A5A40]/20"
-          >
-            <Plus className="w-5 h-5" />
-            <span className="hidden sm:inline">Manage Categories</span>
-          </button>
-        </div>
-
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <AnimatePresence mode="popLayout">
             {notices.map((notice) => (
