@@ -16,29 +16,7 @@ export default defineConfig(({mode}) => {
         devOptions: {
           enabled: true
         },
-        manifest: {
-          name: 'Courtyard F Admin',
-          short_name: 'Courtyard F Admin',
-          description: 'Transparent Fund Management',
-          theme_color: '#5A5A40',
-          background_color: '#F5F5F0',
-          display: 'standalone',
-          start_url: '/adminpanel',
-          icons: [
-            {
-              src: 'https://raw.githubusercontent.com/acegikmo135/assets/main/vbub4efh.jpg',
-              sizes: '192x192',
-              type: 'image/jpeg',
-              purpose: 'any maskable'
-            },
-            {
-              src: 'https://raw.githubusercontent.com/acegikmo135/assets/main/vbub4efh.jpg',
-              sizes: '512x512',
-              type: 'image/jpeg',
-              purpose: 'any maskable'
-            }
-          ]
-        }
+        manifest: false
       })
     ],
     define: {

@@ -6,10 +6,11 @@
       "type": "object",
       "properties": {
         "flatNo": { "type": "string", "description": "The flat number (e.g., F601)." },
+        "name": { "type": "string", "description": "Name of the resident." },
         "password": { "type": "string", "description": "The password for login." },
         "role": { "type": "string", "enum": ["admin", "resident"], "description": "The role of the flat." }
       },
-      "required": ["flatNo", "password", "role"]
+      "required": ["flatNo", "role"]
     },
     "Transaction": {
       "title": "Transaction",
@@ -24,6 +25,30 @@
         "createdBy": { "type": "string", "description": "The flat ID that created this entry." }
       },
       "required": ["type", "amount", "category", "date", "createdBy"]
+    },
+    "Comment": {
+      "title": "Comment",
+      "description": "A comment on a transaction.",
+      "type": "object",
+      "properties": {
+        "text": { "type": "string", "description": "The comment text." },
+        "createdBy": { "type": "string", "description": "The flat ID that created this comment." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the comment was created." },
+        "role": { "type": "string", "enum": ["admin", "resident"], "description": "The role of the commenter." }
+      },
+      "required": ["text", "createdBy", "createdAt", "role"]
+    },
+    "Notice": {
+      "title": "Notice",
+      "description": "A notice from the admin.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "The notice title." },
+        "content": { "type": "string", "description": "The notice content." },
+        "createdBy": { "type": "string", "description": "The flat ID that created this notice." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the notice was created." }
+      },
+      "required": ["title", "content", "createdBy", "createdAt"]
     }
   },
   "firestore": {
@@ -34,6 +59,14 @@
     "/transactions/{transactionId}": {
       "schema": "Transaction",
       "description": "Collection of all financial transactions."
+    },
+    "/transactions/{transactionId}/comments/{commentId}": {
+      "schema": "Comment",
+      "description": "Collection of comments on a transaction."
+    },
+    "/notices/{noticeId}": {
+      "schema": "Notice",
+      "description": "Collection of notices from admins."
     }
   }
 }

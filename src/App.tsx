@@ -38,7 +38,8 @@ import {
   AlertCircle,
   Download,
   Search,
-  Filter
+  Filter,
+  Fingerprint
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -61,6 +62,8 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, startOf
 import { BrowserRouter, Routes, Route, Link, useNavigate } from 'react-router-dom';
 import { AdminPanel } from './components/AdminPanel';
 import { InstallPWA } from './components/InstallPWA';
+import { CommentsModal } from './components/CommentsModal';
+import { Profile } from './components/Profile';
 import { LanguageProvider, useLanguage } from './contexts/LanguageContext';
 import { motion, AnimatePresence } from 'motion/react';
 import jsPDF from 'jspdf';
@@ -89,6 +92,14 @@ interface FlatInfo {
   role: 'admin' | 'resident';
 }
 
+interface Notice {
+  id: string;
+  title: string;
+  content: string;
+  createdBy: string;
+  createdAt: Timestamp;
+}
+
 const CATEGORIES = [
   { id: 'plumbing', name: 'Plumbing', icon: Wrench },
   { id: 'wiring', name: 'Wiring', icon: Zap },
@@ -113,12 +124,14 @@ function Dashboard() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [selectedTransactionForComments, setSelectedTransactionForComments] = useState<Transaction | null>(null);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportType, setExportType] = useState<'monthly' | 'yearly'>('monthly');
   const [exportYear, setExportYear] = useState(new Date().getFullYear());
   const [exportMonth, setExportMonth] = useState(new Date().getMonth());
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
+  const [notices, setNotices] = useState<Notice[]>([]);
 
   // Chart State
   const [chartView, setChartView] = useState<'pie' | 'line'>('pie');
@@ -173,6 +186,22 @@ function Dashboard() {
         ...doc.data()
       })) as Transaction[];
       setTransactions(data);
+    }, (error) => {
+      console.error("Firestore Error: ", error);
+    });
+    return () => unsubscribe();
+  }, [user]);
+
+  // Notices Listener
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, 'notices'), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Notice[];
+      setNotices(data);
     }, (error) => {
       console.error("Firestore Error: ", error);
     });
@@ -417,6 +446,30 @@ function Dashboard() {
 
   const COLORS = ['#5A5A40', '#8E8E6B', '#C2C296', '#E6E6D1', '#A3A375', '#70704F'];
 
+  const handlePasskeyLogin = async () => {
+    try {
+      const credential = await navigator.credentials.get({
+        publicKey: {
+          challenge: new Uint8Array(32), // In a real app, this should come from the server
+          rpId: window.location.hostname,
+          userVerification: "required",
+          timeout: 60000
+        }
+      });
+
+      if (credential) {
+        // In a real app, you would send the credential to the server to verify the signature
+        // and then issue a session token. Since we are using Firebase Auth and don't have a backend
+        // to verify the WebAuthn signature, we can't securely log the user in this way without Identity Platform.
+        // For demonstration purposes, we'll show an alert explaining this limitation.
+        alert("Passkey authentication requires Firebase Identity Platform or a custom backend to verify the signature. The passkey was successfully retrieved from your device: " + credential.id);
+      }
+    } catch (err: any) {
+      console.error("Error during passkey login:", err);
+      setAuthError("Failed to sign in with passkey.");
+    }
+  };
+
   if (!user && !loading) {
     return (
       <div className="min-h-screen bg-[#F5F5F0] flex items-center justify-center p-4">
@@ -476,6 +529,25 @@ function Dashboard() {
             </button>
           </form>
 
+          <div className="mt-6">
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-black/5"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white text-[#5A5A40]/60">Or continue with</span>
+              </div>
+            </div>
+
+            <button
+              onClick={handlePasskeyLogin}
+              className="mt-6 w-full flex items-center justify-center gap-2 bg-[#F5F5F0] text-[#1A1A1A] py-4 rounded-full font-medium hover:bg-[#EAEAE0] transition-colors border border-black/5"
+            >
+              <Fingerprint className="w-5 h-5 text-[#5A5A40]" />
+              Sign in with Passkey
+            </button>
+          </div>
+
           <div className="mt-8 pt-6 border-t border-black/5 text-center space-y-4">
             <p className="text-xs text-[#5A5A40]/40 uppercase tracking-tighter">
               {t('login.authorized')}
@@ -531,6 +603,12 @@ function Dashboard() {
             >
               {language === 'en' ? 'GU' : 'EN'}
             </button>
+            <Link 
+              to="/profile" 
+              className="p-2 hover:bg-[#F5F5F0] rounded-full transition-colors text-[#5A5A40]"
+            >
+              <UserIcon className="w-5 h-5" />
+            </Link>
             {flatInfo?.role === 'admin' && (
               <Link 
                 to="/adminpanel" 
@@ -602,6 +680,30 @@ function Dashboard() {
             </>
           )}
         </div>
+
+        {/* Notices Section */}
+        {notices.length > 0 && (
+          <div className="bg-white p-6 rounded-[32px] shadow-sm border border-[#5A5A40]/10 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-1 h-full bg-[#5A5A40]" />
+            <h3 className="text-xl font-serif mb-4 flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-[#5A5A40]" />
+              Building Notices
+            </h3>
+            <div className="space-y-4">
+              {notices.map((notice) => (
+                <div key={notice.id} className="p-4 bg-[#F5F5F0] rounded-2xl">
+                  <div className="flex justify-between items-start mb-2">
+                    <h4 className="font-medium text-[#1A1A1A]">{notice.title}</h4>
+                    <span className="text-[10px] uppercase tracking-widest font-bold text-[#5A5A40]/40">
+                      {notice.createdAt?.toDate ? notice.createdAt.toDate().toLocaleDateString() : 'Just now'}
+                    </span>
+                  </div>
+                  <p className="text-sm text-[#5A5A40]/80 whitespace-pre-wrap">{notice.content}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Actions & List */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -719,15 +821,24 @@ function Dashboard() {
                             By {t.createdBy}
                           </p>
                         </div>
-                        {flatInfo?.role === 'admin' && (
+                        <div className="flex items-center gap-2">
                           <button 
-                            onClick={() => setDeletingId(t.id)}
-                            className="p-2 text-rose-600/60 hover:text-rose-600 hover:bg-rose-50 rounded-full transition-all"
-                            title="Delete Transaction"
+                            onClick={() => setSelectedTransactionForComments(t)}
+                            className="p-2 text-[#5A5A40]/60 hover:text-[#5A5A40] hover:bg-[#F5F5F0] rounded-full transition-all"
+                            title="View Comments"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-message-circle"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>
                           </button>
-                        )}
+                          {flatInfo?.role === 'admin' && (
+                            <button 
+                              onClick={() => setDeletingId(t.id)}
+                              className="p-2 text-rose-600/60 hover:text-rose-600 hover:bg-rose-50 rounded-full transition-all"
+                              title="Delete Transaction"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </motion.div>
                   ))
@@ -1138,6 +1249,19 @@ function Dashboard() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Comments Modal */}
+      <AnimatePresence>
+        {selectedTransactionForComments && flatInfo && (
+          <CommentsModal
+            transactionId={selectedTransactionForComments.id}
+            transactionTitle={selectedTransactionForComments.description || selectedTransactionForComments.category}
+            currentUserFlatNo={flatInfo.flatNo}
+            currentUserRole={flatInfo.role}
+            onClose={() => setSelectedTransactionForComments(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -1149,6 +1273,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/adminpanel" element={<AdminPanel />} />
+          <Route path="/profile" element={<Profile />} />
         </Routes>
         <InstallPWA />
       </BrowserRouter>
