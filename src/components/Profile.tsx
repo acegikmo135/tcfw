@@ -30,7 +30,7 @@ export function Profile() {
             const flatDoc = await getDoc(doc(db, 'flats', flatId));
             if (flatDoc.exists()) {
               if (flatDoc.data().name) setName(flatDoc.data().name);
-              if (flatDoc.data().hasPasskey) setHasPasskey(true);
+              if (flatDoc.data().passkeyEnabled) setHasPasskey(true);
             }
           }
         } catch (err) {
@@ -90,44 +90,52 @@ export function Profile() {
         throw new Error("WebAuthn is not supported in this browser.");
       }
 
-      const challenge = new Uint8Array(32);
-      window.crypto.getRandomValues(challenge);
+      // 1. Get options from server
+      const optionsRes = await fetch("/api/auth/register/options", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: user.email })
+      });
       
-      const userId = new Uint8Array(16);
-      window.crypto.getRandomValues(userId);
+      if (!optionsRes.ok) throw new Error("Failed to get registration options");
+      const options = await optionsRes.json();
 
+      // 2. Convert options for navigator.credentials.create
       const publicKeyCredentialCreationOptions: PublicKeyCredentialCreationOptions = {
-        challenge,
-        rp: {
-          name: "Courtyard F Admin",
-        },
+        ...options,
+        challenge: Uint8Array.from(atob(options.challenge), c => c.charCodeAt(0)),
         user: {
-          id: userId,
-          name: user.email || "user",
-          displayName: name || "User",
-        },
-        pubKeyCredParams: [{alg: -7, type: "public-key"}, {alg: -257, type: "public-key"}],
-        authenticatorSelection: {
-          authenticatorAttachment: "platform",
-          userVerification: "required"
-        },
-        timeout: 60000,
-        attestation: "none"
+          ...options.user,
+          id: Uint8Array.from(options.user.id, c => c.charCodeAt(0))
+        }
       };
 
       const credential = await navigator.credentials.create({
         publicKey: publicKeyCredentialCreationOptions
-      });
+      }) as any;
 
       if (credential) {
-        // Store in firestore
+        // 3. Verify with server
         const flatId = user.email?.split('@')[0] || '';
-        if (flatId) {
-          await updateDoc(doc(db, 'flats', flatId), {
-            hasPasskey: true,
-            passkeyId: credential.id
-          });
-        }
+        const verifyRes = await fetch("/api/auth/register/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: user.email,
+            flatId,
+            attestationResponse: {
+              id: credential.id,
+              rawId: btoa(String.fromCharCode(...new Uint8Array(credential.rawId))),
+              response: {
+                attestationObject: btoa(String.fromCharCode(...new Uint8Array(credential.response.attestationObject))),
+                clientDataJSON: btoa(String.fromCharCode(...new Uint8Array(credential.response.clientDataJSON)))
+              }
+            }
+          })
+        });
+
+        if (!verifyRes.ok) throw new Error("Failed to verify passkey registration");
+
         setHasPasskey(true);
         setSuccess('Passkey added successfully!');
         setTimeout(() => setSuccess(''), 3000);

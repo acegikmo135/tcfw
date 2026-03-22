@@ -21,6 +21,7 @@ import {
   createUserWithEmailAndPassword, 
   onAuthStateChanged, 
   signOut, 
+  signInWithCustomToken,
   User 
 } from 'firebase/auth';
 import { db, auth } from './firebase';
@@ -133,6 +134,7 @@ function Dashboard() {
   const [selectedTransactionForComments, setSelectedTransactionForComments] = useState<Transaction | null>(null);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [loginFlatNo, setLoginFlatNo] = useState('');
   const [passkeyFlats, setPasskeyFlats] = useState<any[]>([]);
   const [exportType, setExportType] = useState<'monthly' | 'yearly'>('monthly');
   const [exportYear, setExportYear] = useState(new Date().getFullYear());
@@ -219,7 +221,7 @@ function Dashboard() {
   // Fetch flats with passkeys for login
   useEffect(() => {
     if (!user) {
-      const q = query(collection(db, 'flats'), where('hasPasskey', '==', true));
+      const q = query(collection(db, 'flats'), where('passkeyEnabled', '==', true));
       const unsubscribe = onSnapshot(q, (snapshot) => {
         const data = snapshot.docs.map(doc => ({
           id: doc.id,
@@ -468,66 +470,76 @@ function Dashboard() {
 
   const handlePasskeyLogin = async () => {
     try {
-      if (passkeyFlats.length === 0) {
-        setAuthError("No passkeys are registered in the system yet.");
+      if (!loginFlatNo) {
+        setAuthError("Please enter your Flat Number first.");
         return;
       }
 
-      const challenge = new Uint8Array(32);
-      window.crypto.getRandomValues(challenge);
+      const email = `${loginFlatNo.toLowerCase()}@building.local`;
 
-      const allowCredentials = passkeyFlats
-        .filter(f => f.passkeyId)
-        .map(f => {
-          // Convert base64url to Uint8Array
-          const base64 = f.passkeyId.replace(/-/g, '+').replace(/_/g, '/');
-          const pad = base64.length % 4;
-          const padded = pad ? base64 + '='.repeat(4 - pad) : base64;
-          const binary = atob(padded);
-          const bytes = new Uint8Array(binary.length);
-          for (let i = 0; i < binary.length; i++) {
-            bytes[i] = binary.charCodeAt(i);
-          }
-          return {
-            id: bytes,
-            type: 'public-key' as const,
-            transports: ['internal'] as AuthenticatorTransport[]
-          };
-        });
-
-      if (allowCredentials.length === 0) {
-        setAuthError("No passkeys are available for login.");
-        return;
+      // 1. Get options from server
+      const optionsRes = await fetch("/api/auth/login/options", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email })
+      });
+      
+      if (!optionsRes.ok) {
+        const errData = await optionsRes.json();
+        throw new Error(errData.error || "Failed to get login options");
       }
+      const options = await optionsRes.json();
+
+      // 2. Convert options for navigator.credentials.get
+      const publicKeyCredentialRequestOptions: PublicKeyCredentialRequestOptions = {
+        ...options,
+        challenge: Uint8Array.from(atob(options.challenge), c => c.charCodeAt(0)),
+        allowCredentials: options.allowCredentials.map((cred: any) => ({
+          ...cred,
+          id: Uint8Array.from(atob(cred.id), c => c.charCodeAt(0))
+        }))
+      };
 
       const credential = await navigator.credentials.get({
-        publicKey: {
-          challenge,
-          allowCredentials,
-          userVerification: 'preferred',
-          timeout: 60000,
-        }
-      }) as PublicKeyCredential;
+        publicKey: publicKeyCredentialRequestOptions
+      }) as any;
 
       if (credential) {
-        const passkeyId = credential.id;
-        const flat = passkeyFlats.find(f => f.passkeyId === passkeyId);
-        
-        if (flat) {
-          // In a real app, you'd send the credential to your server to verify and get a custom token.
-          // For this demo, we'll try to sign in with the flat's email and a "secret" if we had one,
-          // but since we don't, we'll just alert and explain.
-          alert(`Passkey verified for Flat ${flat.flatNo}! In a production app, you would now be securely logged in. For this demo, please use your password.`);
-        } else {
-          setAuthError("Passkey verified but no matching account found.");
+        // 3. Verify with server
+        const verifyRes = await fetch("/api/auth/login/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email,
+            assertionResponse: {
+              id: credential.id,
+              rawId: btoa(String.fromCharCode(...new Uint8Array(credential.rawId))),
+              response: {
+                authenticatorData: btoa(String.fromCharCode(...new Uint8Array(credential.response.authenticatorData))),
+                clientDataJSON: btoa(String.fromCharCode(...new Uint8Array(credential.response.clientDataJSON))),
+                signature: btoa(String.fromCharCode(...new Uint8Array(credential.response.signature))),
+                userHandle: credential.response.userHandle ? btoa(String.fromCharCode(...new Uint8Array(credential.response.userHandle))) : null
+              }
+            }
+          })
+        });
+
+        if (!verifyRes.ok) {
+          const errData = await verifyRes.json();
+          throw new Error(errData.error || "Failed to verify passkey login");
         }
+
+        const { customToken } = await verifyRes.json();
+
+        // 4. Sign in with Firebase Custom Token
+        await signInWithCustomToken(auth, customToken);
       }
     } catch (err: any) {
       console.error("Error during passkey login:", err);
       if (err.name === 'NotAllowedError' || err.message.includes('Permissions Policy')) {
         setAuthError("Passkeys are restricted in this preview window. Please open the app in a new tab to sign in with a passkey.");
       } else {
-        setAuthError("Failed to sign in with passkey.");
+        setAuthError(err.message || "Failed to sign in with passkey.");
       }
     }
   };
@@ -556,6 +568,8 @@ function Dashboard() {
                 <input 
                   name="flatNo"
                   required
+                  value={loginFlatNo}
+                  onChange={(e) => setLoginFlatNo(e.target.value)}
                   placeholder={t('login.flatNoPlaceholder')}
                   className="w-full pl-12 pr-4 py-3 bg-[#F5F5F0] border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40]/20 outline-none transition-all"
                 />
