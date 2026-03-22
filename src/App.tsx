@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+/// <reference types="vite/client" />
+import React, { Component, useState, useEffect, useMemo } from 'react';
 import { 
   collection, 
   addDoc, 
@@ -24,7 +25,7 @@ import {
   signInWithCustomToken,
   User 
 } from 'firebase/auth';
-import { db, auth } from './firebase';
+import { db, auth, handleFirestoreError, OperationType } from './firebase';
 import { 
   LayoutDashboard, 
   PlusCircle, 
@@ -45,8 +46,10 @@ import {
   Filter,
   Fingerprint,
   Eye,
-  EyeOff
+  EyeOff,
+  Smartphone
 } from 'lucide-react';
+import OneSignal from 'react-onesignal';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { 
@@ -81,6 +84,7 @@ function cn(...inputs: ClassValue[]) {
 }
 
 // --- Types ---
+
 type TransactionType = 'income' | 'expense';
 
 interface Transaction {
@@ -135,13 +139,14 @@ function Dashboard() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loginFlatNo, setLoginFlatNo] = useState('');
-  const [passkeyFlats, setPasskeyFlats] = useState<any[]>([]);
   const [exportType, setExportType] = useState<'monthly' | 'yearly'>('monthly');
   const [exportYear, setExportYear] = useState(new Date().getFullYear());
   const [exportMonth, setExportMonth] = useState(new Date().getMonth());
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
   const [notices, setNotices] = useState<Notice[]>([]);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [categories, setCategories] = useState<{id: string, name: string}[]>([]);
 
   // Chart State
   const [chartView, setChartView] = useState<'pie' | 'line'>('pie');
@@ -162,7 +167,62 @@ function Dashboard() {
     return Array.from(uniqueYears).sort((a, b) => b - a);
   }, [transactions]);
 
-  // Auth Listener
+  // Connection Test
+  useEffect(() => {
+    async function testConnection() {
+      try {
+        await getDocFromServer(doc(db, 'test', 'connection'));
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('the client is offline')) {
+          console.error("Please check your Firebase configuration.");
+          setConnectionError("Firestore is offline. Please check your Firebase configuration.");
+        }
+      }
+    }
+    testConnection();
+  }, []);
+
+  // OneSignal initialization
+  useEffect(() => {
+    const initOneSignal = async () => {
+      const appId = process.env.VITE_ONESIGNAL_APP_ID;
+      if (!appId) return;
+      try {
+        await OneSignal.init({
+          appId,
+          allowLocalhostAsSecureOrigin: true,
+        });
+        OneSignal.Slidedown.promptPush();
+      } catch (e) {
+        console.error("OneSignal init error:", e);
+      }
+    };
+    initOneSignal();
+  }, []);
+
+  useEffect(() => {
+    const q = query(collection(db, 'categories'), orderBy('name', 'asc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({
+        id: doc.id,
+        name: doc.data().name
+      }));
+      if (data.length === 0) {
+        setCategories([
+          { id: 'plumbing', name: 'Plumbing' },
+          { id: 'wiring', name: 'Wiring' },
+          { id: 'maintenance', name: 'Maintenance' },
+          { id: 'security', name: 'Security' },
+          { id: 'cleaning', name: 'Cleaning' },
+          { id: 'others', name: 'Others' }
+        ]);
+      } else {
+        setCategories(data);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
       try {
@@ -197,7 +257,7 @@ function Dashboard() {
       })) as Transaction[];
       setTransactions(data);
     }, (error) => {
-      console.error("Firestore Error: ", error);
+      handleFirestoreError(error, OperationType.GET, 'transactions');
     });
     return () => unsubscribe();
   }, [user]);
@@ -213,24 +273,9 @@ function Dashboard() {
       })) as Notice[];
       setNotices(data);
     }, (error) => {
-      console.error("Firestore Error: ", error);
+      handleFirestoreError(error, OperationType.GET, 'notices');
     });
     return () => unsubscribe();
-  }, [user]);
-
-  // Fetch flats with passkeys for login
-  useEffect(() => {
-    if (!user) {
-      const q = query(collection(db, 'flats'), where('passkeyEnabled', '==', true));
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        const data = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        setPasskeyFlats(data);
-      });
-      return () => unsubscribe();
-    }
   }, [user]);
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -296,8 +341,8 @@ function Dashboard() {
     setDeletingId(null);
     try {
       await deleteDoc(doc(db, 'transactions', id));
-    } catch (err) {
-      console.error("Delete error:", err);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `transactions/${id}`);
     }
   };
 
@@ -529,7 +574,8 @@ function Dashboard() {
           throw new Error(errData.error || "Failed to verify passkey login");
         }
 
-        const { customToken } = await verifyRes.json();
+        const verifyData = await verifyRes.json();
+        const { customToken } = verifyData;
 
         // 4. Sign in with Firebase Custom Token
         await signInWithCustomToken(auth, customToken);
@@ -1079,6 +1125,10 @@ function Dashboard() {
                   : t('dash.healthBad')}
               </p>
             </div>
+
+            <div className="mt-4">
+              <InstallPWA />
+            </div>
           </div>
         </div>
       </main>
@@ -1142,9 +1192,18 @@ function Dashboard() {
                   setIsAdding(false);
                   try {
                     await addDoc(collection(db, 'transactions'), data);
-                  } catch (err) {
-                    console.error("Error adding transaction:", err);
-                    alert(t('tx.error'));
+                    // Trigger notification
+                    fetch('/api/notify', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        title: `New ${data.type === 'income' ? 'Income' : 'Expense'}`,
+                        message: `${data.description || data.category}: ₹${data.amount} by ${data.createdBy}`,
+                        url: window.location.origin
+                      })
+                    }).catch(err => console.error("Notification error:", err));
+                  } catch (error) {
+                    handleFirestoreError(error, OperationType.CREATE, 'transactions');
                   }
                 }}
                 className="space-y-6"
@@ -1184,7 +1243,7 @@ function Dashboard() {
                       required
                       className="w-full px-4 py-3 bg-[#F5F5F0] border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40]/20 outline-none appearance-none"
                     >
-                      {CATEGORIES.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                      {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                     </select>
                   </div>
                 </div>
@@ -1367,17 +1426,68 @@ function Dashboard() {
   );
 }
 
+interface ErrorBoundaryProps {
+  children: React.ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: any;
+}
+
+class ErrorBoundary extends (Component as any) {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: any): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: any, errorInfo: any) {
+    console.error("ErrorBoundary caught an error", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-[#F5F5F0] p-4 text-black">
+          <div className="bg-white p-8 rounded-[32px] shadow-xl max-w-md w-full text-center">
+            <h2 className="text-2xl font-serif mb-4">Something went wrong</h2>
+            <p className="text-gray-600 mb-6">
+              {this.state.error?.message?.startsWith('{') 
+                ? "A database error occurred. The developers have been notified."
+                : "An unexpected error occurred. Please try refreshing the page."}
+            </p>
+            <button 
+              onClick={() => window.location.reload()}
+              className="w-full py-4 bg-black text-white rounded-2xl font-medium hover:bg-zinc-800 transition-all"
+            >
+              Refresh Page
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return (this.props as any).children;
+  }
+}
+
 export default function App() {
   return (
-    <LanguageProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/adminpanel" element={<AdminPanel />} />
-          <Route path="/profile" element={<Profile />} />
-        </Routes>
-        <InstallPWA />
-      </BrowserRouter>
-    </LanguageProvider>
+    <ErrorBoundary>
+      <LanguageProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/adminpanel" element={<AdminPanel />} />
+            <Route path="/profile" element={<Profile />} />
+          </Routes>
+          <InstallPWA />
+        </BrowserRouter>
+      </LanguageProvider>
+    </ErrorBoundary>
   );
 }

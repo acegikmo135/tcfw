@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, Timestamp, deleteDoc, doc, updateDoc, increment } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, handleFirestoreError, OperationType } from '../firebase';
 import { Trash2, Send, Loader2, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { clsx, type ClassValue } from 'clsx';
@@ -47,7 +47,7 @@ export function CommentsModal({ transactionId, transactionTitle, currentUserFlat
       setComments(data);
       setLoading(false);
     }, (error) => {
-      console.error("Firestore Error fetching comments: ", error);
+      handleFirestoreError(error, OperationType.GET, `transactions/${transactionId}/comments`);
       setLoading(false);
     });
 
@@ -72,9 +72,20 @@ export function CommentsModal({ transactionId, transactionTitle, currentUserFlat
         commentCount: increment(1)
       });
       
+      // Trigger notification
+      fetch('/api/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: `New Comment on ${transactionTitle}`,
+          message: `${currentUserFlatNo}: ${newComment.trim().substring(0, 50)}${newComment.trim().length > 50 ? '...' : ''}`,
+          url: window.location.origin
+        })
+      }).catch(err => console.error("Notification error:", err));
+
       setNewComment('');
-    } catch (err) {
-      console.error("Error adding comment:", err);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `transactions/${transactionId}/comments`);
     } finally {
       setSubmitting(false);
     }
@@ -88,8 +99,8 @@ export function CommentsModal({ transactionId, transactionTitle, currentUserFlat
       await updateDoc(doc(db, 'transactions', transactionId), {
         commentCount: increment(-1)
       });
-    } catch (err) {
-      console.error("Error deleting comment:", err);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `transactions/${transactionId}/comments/${commentId}`);
     }
   };
 

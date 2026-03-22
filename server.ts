@@ -6,6 +6,7 @@ import cookieParser from "cookie-parser";
 import { Fido2Lib } from "fido2-lib";
 import admin from "firebase-admin";
 import fs from "fs";
+import * as OneSignal from 'onesignal-node';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -39,12 +40,30 @@ if (!admin.apps.length) {
   }
 }
 
-const db = admin.firestore(admin.app());
-if (firebaseConfig.firestoreDatabaseId) {
-  // If using a named database
-  // admin.firestore().databaseId = firebaseConfig.firestoreDatabaseId;
-  // Actually, in admin sdk, you specify the databaseId in the firestore() call or settings
-  // But for simplicity, we'll assume the default or handle it if needed
+const db = admin.firestore();
+if (firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== "(default)") {
+  // @ts-ignore - databaseId is supported in newer versions of firebase-admin
+  db.settings({ databaseId: firebaseConfig.firestoreDatabaseId });
+}
+
+// Initialize OneSignal
+const oneSignalClient = process.env.ONESIGNAL_APP_ID && process.env.ONESIGNAL_REST_API_KEY
+  ? new OneSignal.Client(process.env.ONESIGNAL_APP_ID, process.env.ONESIGNAL_REST_API_KEY)
+  : null;
+
+async function sendNotification(title: string, message: string, data?: any) {
+  if (!oneSignalClient) return;
+  try {
+    const notification = {
+      contents: { en: message },
+      headings: { en: title },
+      included_segments: ["All"],
+      data: data || {}
+    };
+    await oneSignalClient.createNotification(notification);
+  } catch (e) {
+    console.error("Failed to send notification:", e);
+  }
 }
 
 const f2l = new Fido2Lib({
@@ -99,7 +118,7 @@ async function startServer() {
 
       const clientAttestationResponse = {
         id: attestationResponse.id,
-        rawId: Buffer.from(attestationResponse.rawId, "base64"),
+        rawId: new Uint8Array(Buffer.from(attestationResponse.rawId, "base64")).buffer as ArrayBuffer,
         response: {
           attestationObject: attestationResponse.response.attestationObject,
           clientDataJSON: attestationResponse.response.clientDataJSON
@@ -123,6 +142,8 @@ async function startServer() {
         counter: counter,
         passkeyEnabled: true
       });
+
+      await sendNotification("Passkey Registered", `Passkey successfully registered for ${email}`);
 
       res.json({ success: true });
     } catch (error) {
@@ -185,7 +206,7 @@ async function startServer() {
 
       const clientAssertionResponse = {
         id: assertionResponse.id,
-        rawId: Buffer.from(assertionResponse.rawId, "base64"),
+        rawId: new Uint8Array(Buffer.from(assertionResponse.rawId, "base64")).buffer as ArrayBuffer,
         response: {
           authenticatorData: assertionResponse.response.authenticatorData,
           clientDataJSON: assertionResponse.response.clientDataJSON,
@@ -198,7 +219,7 @@ async function startServer() {
         challenge: challenge,
         origin: process.env.APP_URL || "http://localhost:3000",
         factor: "either",
-        publicKey: Buffer.from(flatData.publicKey, "base64"),
+        publicKey: (new Uint8Array(Buffer.from(flatData.publicKey, "base64")).buffer as any),
         prevCounter: flatData.counter,
         userHandle: null
       });
@@ -217,6 +238,32 @@ async function startServer() {
     } catch (error) {
       console.error("Login verify error:", error);
       res.status(500).json({ error: "Failed to verify login" });
+    }
+  });
+
+  // OneSignal Notification Helper
+  app.post("/api/notify", async (req, res) => {
+    try {
+      const { title, message, url, data } = req.body;
+      if (!oneSignalClient) return res.status(503).json({ error: "OneSignal not configured" });
+
+      const notification = {
+        contents: {
+          en: message,
+        },
+        headings: {
+          en: title,
+        },
+        included_segments: ['All'],
+        url: url || process.env.APP_URL || "http://localhost:3000",
+        data: data || {}
+      };
+
+      const response = await oneSignalClient.createNotification(notification);
+      res.json({ success: true, response });
+    } catch (error) {
+      console.error("OneSignal error:", error);
+      res.status(500).json({ error: "Failed to send notification" });
     }
   });
 
