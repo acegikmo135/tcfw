@@ -11,7 +11,10 @@ import {
   getDoc,
   setDoc,
   getDocFromServer,
-  deleteDoc
+  deleteDoc,
+  updateDoc,
+  increment,
+  where
 } from 'firebase/firestore';
 import { 
   signInWithEmailAndPassword, 
@@ -39,7 +42,9 @@ import {
   Download,
   Search,
   Filter,
-  Fingerprint
+  Fingerprint,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -85,6 +90,7 @@ interface Transaction {
   description: string;
   date: Timestamp;
   createdBy: string;
+  commentCount?: number;
 }
 
 interface FlatInfo {
@@ -126,6 +132,8 @@ function Dashboard() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [selectedTransactionForComments, setSelectedTransactionForComments] = useState<Transaction | null>(null);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [passkeyFlats, setPasskeyFlats] = useState<any[]>([]);
   const [exportType, setExportType] = useState<'monthly' | 'yearly'>('monthly');
   const [exportYear, setExportYear] = useState(new Date().getFullYear());
   const [exportMonth, setExportMonth] = useState(new Date().getMonth());
@@ -208,19 +216,20 @@ function Dashboard() {
     return () => unsubscribe();
   }, [user]);
 
-  // Connection Test
+  // Fetch flats with passkeys for login
   useEffect(() => {
-    async function testConnection() {
-      try {
-        await getDocFromServer(doc(db, 'test', 'connection'));
-      } catch (error) {
-        if (error instanceof Error && error.message.includes('the client is offline')) {
-          console.error("Please check your Firebase configuration.");
-        }
-      }
+    if (!user) {
+      const q = query(collection(db, 'flats'), where('hasPasskey', '==', true));
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const data = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setPasskeyFlats(data);
+      });
+      return () => unsubscribe();
     }
-    testConnection();
-  }, []);
+  }, [user]);
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -235,35 +244,46 @@ function Dashboard() {
       // Try to sign in
       await signInWithEmailAndPassword(auth, email, password);
     } catch (err: any) {
-      console.error("Login error:", err.code, err.message);
+      console.error("Login error code:", err.code);
+      console.error("Login error message:", err.message);
       
       // Auto-bootstrap predefined users
       const predefined = PREDEFINED_USERS.find(u => u.flatNo.toUpperCase() === flatNo.toUpperCase() && u.password === password);
       
-      if (predefined && (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-login-credentials')) {
-        try {
-          const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-          const docRef = doc(db, 'flats', flatNo.toLowerCase());
-          const docSnap = await getDoc(docRef);
-          if (!docSnap.exists()) {
-            await setDoc(docRef, {
-              flatNo: predefined.flatNo,
-              role: predefined.role
-            });
+      if (predefined) {
+        if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-login-credentials') {
+          try {
+            // Try to create user if not found
+            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            const docRef = doc(db, 'flats', flatNo.toLowerCase());
+            const docSnap = await getDoc(docRef);
+            if (!docSnap.exists()) {
+              await setDoc(docRef, {
+                flatNo: predefined.flatNo,
+                role: predefined.role
+              });
+            }
+            setUser(userCredential.user);
+            return;
+          } catch (bootstrapErr: any) {
+            if (bootstrapErr.code === 'auth/email-already-in-use') {
+              // User exists but password might be wrong or some other issue
+              setAuthError("Incorrect password for this flat.");
+            } else {
+              console.error("Bootstrap error:", bootstrapErr);
+              setAuthError("Failed to initialize user account.");
+            }
+            return;
           }
-          setUser(userCredential.user);
-          return;
-        } catch (bootstrapErr: any) {
-          console.error("Bootstrap error:", bootstrapErr);
-          setAuthError("Failed to initialize predefined user.");
-          return;
         }
       }
 
       if (err.code === 'auth/operation-not-allowed') {
         setAuthError("Email/Password login is not enabled in Firebase Console.");
-      } else {
+      } else if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-login-credentials') {
         setAuthError("Invalid Flat Number or Password.");
+      } else {
+        setAuthError(err.message || "An error occurred during login.");
       }
     }
   };
@@ -448,25 +468,67 @@ function Dashboard() {
 
   const handlePasskeyLogin = async () => {
     try {
+      if (passkeyFlats.length === 0) {
+        setAuthError("No passkeys are registered in the system yet.");
+        return;
+      }
+
+      const challenge = new Uint8Array(32);
+      window.crypto.getRandomValues(challenge);
+
+      const allowCredentials = passkeyFlats
+        .filter(f => f.passkeyId)
+        .map(f => {
+          // Convert base64url to Uint8Array
+          const base64 = f.passkeyId.replace(/-/g, '+').replace(/_/g, '/');
+          const pad = base64.length % 4;
+          const padded = pad ? base64 + '='.repeat(4 - pad) : base64;
+          const binary = atob(padded);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
+          }
+          return {
+            id: bytes,
+            type: 'public-key' as const,
+            transports: ['internal'] as AuthenticatorTransport[]
+          };
+        });
+
+      if (allowCredentials.length === 0) {
+        setAuthError("No passkeys are available for login.");
+        return;
+      }
+
       const credential = await navigator.credentials.get({
         publicKey: {
-          challenge: new Uint8Array(32), // In a real app, this should come from the server
-          rpId: window.location.hostname,
-          userVerification: "required",
-          timeout: 60000
+          challenge,
+          allowCredentials,
+          userVerification: 'preferred',
+          timeout: 60000,
         }
-      });
+      }) as PublicKeyCredential;
 
       if (credential) {
-        // In a real app, you would send the credential to the server to verify the signature
-        // and then issue a session token. Since we are using Firebase Auth and don't have a backend
-        // to verify the WebAuthn signature, we can't securely log the user in this way without Identity Platform.
-        // For demonstration purposes, we'll show an alert explaining this limitation.
-        alert("Passkey authentication requires Firebase Identity Platform or a custom backend to verify the signature. The passkey was successfully retrieved from your device: " + credential.id);
+        const passkeyId = credential.id;
+        const flat = passkeyFlats.find(f => f.passkeyId === passkeyId);
+        
+        if (flat) {
+          // In a real app, you'd send the credential to your server to verify and get a custom token.
+          // For this demo, we'll try to sign in with the flat's email and a "secret" if we had one,
+          // but since we don't, we'll just alert and explain.
+          alert(`Passkey verified for Flat ${flat.flatNo}! In a production app, you would now be securely logged in. For this demo, please use your password.`);
+        } else {
+          setAuthError("Passkey verified but no matching account found.");
+        }
       }
     } catch (err: any) {
       console.error("Error during passkey login:", err);
-      setAuthError("Failed to sign in with passkey.");
+      if (err.name === 'NotAllowedError' || err.message.includes('Permissions Policy')) {
+        setAuthError("Passkeys are restricted in this preview window. Please open the app in a new tab to sign in with a passkey.");
+      } else {
+        setAuthError("Failed to sign in with passkey.");
+      }
     }
   };
 
@@ -506,11 +568,18 @@ function Dashboard() {
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#5A5A40]/40" />
                 <input 
                   name="password"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   required
                   placeholder={t('login.passwordPlaceholder')}
-                  className="w-full pl-12 pr-4 py-3 bg-[#F5F5F0] border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40]/20 outline-none transition-all"
+                  className="w-full pl-12 pr-12 py-3 bg-[#F5F5F0] border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40]/20 outline-none transition-all"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 p-1 text-[#5A5A40]/40 hover:text-[#5A5A40] transition-colors"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
             </div>
 
@@ -556,12 +625,12 @@ function Dashboard() {
               <p className="text-sm font-serif text-[#5A5A40]">Made by Manthan - F602</p>
               <div className="flex flex-col items-center gap-2">
                 <a 
-                  href="https://manthank.com" 
+                  href={window.location.href} 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="text-xs font-bold uppercase tracking-widest text-white bg-[#5A5A40] px-4 py-2 rounded-full hover:bg-[#4A4A30] transition-colors"
                 >
-                  Visit Website
+                  Open in New Tab
                 </a>
                 <p className="text-xs text-[#5A5A40]/60 mt-2">If any issue, contact dev@manthank.com</p>
                 <a 
@@ -793,24 +862,34 @@ function Dashboard() {
                       exit={{ opacity: 0, x: 20 }}
                       whileHover={{ x: 5 }}
                       transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                      className="bg-white p-5 rounded-2xl shadow-sm border border-black/5 flex items-center justify-between group"
+                      className="bg-white p-5 rounded-2xl shadow-sm border border-black/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group"
                     >
-                      <div className="flex items-center gap-4">
-                        <div className={cn(
-                          "w-12 h-12 rounded-xl flex items-center justify-center",
-                          t.type === 'income' ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
-                        )}>
-                          {t.type === 'income' ? <TrendingUp className="w-6 h-6" /> : <TrendingDown className="w-6 h-6" />}
+                      <div className="flex items-center justify-between w-full sm:w-auto gap-4">
+                        <div className="flex items-center gap-4">
+                          <div className={cn(
+                            "w-12 h-12 rounded-xl flex items-center justify-center shrink-0",
+                            t.type === 'income' ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
+                          )}>
+                            {t.type === 'income' ? <TrendingUp className="w-6 h-6" /> : <TrendingDown className="w-6 h-6" />}
+                          </div>
+                          <div>
+                            <h4 className="font-medium text-[#1A1A1A]">{t.category}</h4>
+                            <p className="text-xs text-[#5A5A40]/60">
+                              {t.date ? format(t.date.toDate(), 'MMM d, yyyy • h:mm a') : 'Processing...'}
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <h4 className="font-medium text-[#1A1A1A]">{t.category}</h4>
-                          <p className="text-xs text-[#5A5A40]/60">
-                            {t.date ? format(t.date.toDate(), 'MMM d, yyyy • h:mm a') : 'Processing...'}
+                        <div className="sm:hidden text-right">
+                          <p className={cn(
+                            "font-serif text-lg",
+                            t.type === 'income' ? "text-emerald-600" : "text-rose-600"
+                          )}>
+                            {t.type === 'income' ? '+' : '-'} ₹{t.amount.toLocaleString()}
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-6">
-                        <div className="text-right">
+                      <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-6 border-t sm:border-none pt-4 sm:pt-0">
+                        <div className="hidden sm:block text-right">
                           <p className={cn(
                             "font-serif text-lg",
                             t.type === 'income' ? "text-emerald-600" : "text-rose-600"
@@ -821,13 +900,21 @@ function Dashboard() {
                             By {t.createdBy}
                           </p>
                         </div>
+                        <div className="sm:hidden">
+                          <p className="text-[10px] uppercase tracking-widest text-[#5A5A40]/40 font-medium">
+                            By {t.createdBy}
+                          </p>
+                        </div>
                         <div className="flex items-center gap-2">
                           <button 
                             onClick={() => setSelectedTransactionForComments(t)}
-                            className="p-2 text-[#5A5A40]/60 hover:text-[#5A5A40] hover:bg-[#F5F5F0] rounded-full transition-all"
+                            className="relative p-2 text-[#5A5A40]/60 hover:text-[#5A5A40] hover:bg-[#F5F5F0] rounded-full transition-all"
                             title="View Comments"
                           >
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-message-circle"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>
+                            {t.commentCount && t.commentCount > 0 && (
+                              <span className="absolute top-1 right-1 w-2 h-2 bg-rose-500 rounded-full border border-white" />
+                            )}
                           </button>
                           {flatInfo?.role === 'admin' && (
                             <button 

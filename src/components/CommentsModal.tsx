@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, Timestamp, deleteDoc, doc } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, Timestamp, deleteDoc, doc, updateDoc, increment } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Trash2, Send, Loader2, X } from 'lucide-react';
 import { format } from 'date-fns';
@@ -66,6 +66,12 @@ export function CommentsModal({ transactionId, transactionTitle, currentUserFlat
         role: currentUserRole,
         createdAt: serverTimestamp()
       });
+      
+      // Update comment count on parent transaction
+      await updateDoc(doc(db, 'transactions', transactionId), {
+        commentCount: increment(1)
+      });
+      
       setNewComment('');
     } catch (err) {
       console.error("Error adding comment:", err);
@@ -77,6 +83,11 @@ export function CommentsModal({ transactionId, transactionTitle, currentUserFlat
   const handleDeleteComment = async (commentId: string) => {
     try {
       await deleteDoc(doc(db, 'transactions', transactionId, 'comments', commentId));
+      
+      // Update comment count on parent transaction
+      await updateDoc(doc(db, 'transactions', transactionId), {
+        commentCount: increment(-1)
+      });
     } catch (err) {
       console.error("Error deleting comment:", err);
     }

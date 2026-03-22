@@ -134,7 +134,11 @@ export function Profile() {
       }
     } catch (err: any) {
       console.error(err);
-      setError('Failed to add passkey: ' + (err.message || 'Unknown error'));
+      if (err.name === 'NotAllowedError' || err.message.includes('Permissions Policy')) {
+        setError('Passkeys are restricted in this preview window. Please open the app in a new tab to add a passkey.');
+      } else {
+        setError('Failed to add passkey: ' + (err.message || 'Unknown error'));
+      }
     }
   };
 
