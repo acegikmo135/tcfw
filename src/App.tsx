@@ -1,5 +1,4 @@
-/// <reference types="vite/client" />
-import React, { Component, useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   collection, 
   addDoc, 
@@ -12,20 +11,16 @@ import {
   getDoc,
   setDoc,
   getDocFromServer,
-  deleteDoc,
-  updateDoc,
-  increment,
-  where
+  deleteDoc
 } from 'firebase/firestore';
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
   onAuthStateChanged, 
   signOut, 
-  signInWithCustomToken,
   User 
 } from 'firebase/auth';
-import { db, auth, handleFirestoreError, OperationType } from './firebase';
+import { db, auth } from './firebase';
 import { 
   LayoutDashboard, 
   PlusCircle, 
@@ -43,13 +38,8 @@ import {
   AlertCircle,
   Download,
   Search,
-  Filter,
-  Fingerprint,
-  Eye,
-  EyeOff,
-  Smartphone
+  Filter
 } from 'lucide-react';
-import OneSignal from 'react-onesignal';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { 
@@ -71,8 +61,6 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, startOf
 import { BrowserRouter, Routes, Route, Link, useNavigate } from 'react-router-dom';
 import { AdminPanel } from './components/AdminPanel';
 import { InstallPWA } from './components/InstallPWA';
-import { CommentsModal } from './components/CommentsModal';
-import { Profile } from './components/Profile';
 import { LanguageProvider, useLanguage } from './contexts/LanguageContext';
 import { motion, AnimatePresence } from 'motion/react';
 import jsPDF from 'jspdf';
@@ -84,7 +72,6 @@ function cn(...inputs: ClassValue[]) {
 }
 
 // --- Types ---
-
 type TransactionType = 'income' | 'expense';
 
 interface Transaction {
@@ -95,20 +82,11 @@ interface Transaction {
   description: string;
   date: Timestamp;
   createdBy: string;
-  commentCount?: number;
 }
 
 interface FlatInfo {
   flatNo: string;
   role: 'admin' | 'resident';
-}
-
-interface Notice {
-  id: string;
-  title: string;
-  content: string;
-  createdBy: string;
-  createdAt: Timestamp;
 }
 
 const CATEGORIES = [
@@ -135,18 +113,12 @@ function Dashboard() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [selectedTransactionForComments, setSelectedTransactionForComments] = useState<Transaction | null>(null);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [loginFlatNo, setLoginFlatNo] = useState('');
   const [exportType, setExportType] = useState<'monthly' | 'yearly'>('monthly');
   const [exportYear, setExportYear] = useState(new Date().getFullYear());
   const [exportMonth, setExportMonth] = useState(new Date().getMonth());
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
-  const [notices, setNotices] = useState<Notice[]>([]);
-  const [connectionError, setConnectionError] = useState<string | null>(null);
-  const [categories, setCategories] = useState<{id: string, name: string}[]>([]);
 
   // Chart State
   const [chartView, setChartView] = useState<'pie' | 'line'>('pie');
@@ -167,64 +139,7 @@ function Dashboard() {
     return Array.from(uniqueYears).sort((a, b) => b - a);
   }, [transactions]);
 
-  // Connection Test
-  useEffect(() => {
-    async function testConnection() {
-      try {
-        await getDocFromServer(doc(db, 'test', 'connection'));
-      } catch (error) {
-        if (error instanceof Error && error.message.includes('the client is offline')) {
-          console.error("Please check your Firebase configuration.");
-          setConnectionError("Firestore is offline. Please check your Firebase configuration.");
-        }
-      }
-    }
-    testConnection();
-  }, []);
-
-  // OneSignal initialization
-  useEffect(() => {
-    const initOneSignal = async () => {
-      const appId = import.meta.env.VITE_ONESIGNAL_APP_ID;
-      if (!appId) return;
-      try {
-        await OneSignal.init({
-          appId,
-          allowLocalhostAsSecureOrigin: true,
-          serviceWorkerParam: { scope: '/' },
-          serviceWorkerPath: 'OneSignalSDKWorker.js',
-        });
-        OneSignal.Slidedown.promptPush();
-      } catch (e) {
-        console.error("OneSignal init error:", e);
-      }
-    };
-    initOneSignal();
-  }, []);
-
-  useEffect(() => {
-    const q = query(collection(db, 'categories'), orderBy('name', 'asc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({
-        id: doc.id,
-        name: doc.data().name
-      }));
-      if (data.length === 0) {
-        setCategories([
-          { id: 'plumbing', name: 'Plumbing' },
-          { id: 'wiring', name: 'Wiring' },
-          { id: 'maintenance', name: 'Maintenance' },
-          { id: 'security', name: 'Security' },
-          { id: 'cleaning', name: 'Cleaning' },
-          { id: 'others', name: 'Others' }
-        ]);
-      } else {
-        setCategories(data);
-      }
-    });
-    return () => unsubscribe();
-  }, []);
-
+  // Auth Listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
       try {
@@ -259,26 +174,24 @@ function Dashboard() {
       })) as Transaction[];
       setTransactions(data);
     }, (error) => {
-      handleFirestoreError(error, OperationType.GET, 'transactions');
+      console.error("Firestore Error: ", error);
     });
     return () => unsubscribe();
   }, [user]);
 
-  // Notices Listener
+  // Connection Test
   useEffect(() => {
-    if (!user) return;
-    const q = query(collection(db, 'notices'), orderBy('createdAt', 'desc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Notice[];
-      setNotices(data);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, 'notices');
-    });
-    return () => unsubscribe();
-  }, [user]);
+    async function testConnection() {
+      try {
+        await getDocFromServer(doc(db, 'test', 'connection'));
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('the client is offline')) {
+          console.error("Please check your Firebase configuration.");
+        }
+      }
+    }
+    testConnection();
+  }, []);
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -293,46 +206,35 @@ function Dashboard() {
       // Try to sign in
       await signInWithEmailAndPassword(auth, email, password);
     } catch (err: any) {
-      console.error("Login error code:", err.code);
-      console.error("Login error message:", err.message);
+      console.error("Login error:", err.code, err.message);
       
       // Auto-bootstrap predefined users
       const predefined = PREDEFINED_USERS.find(u => u.flatNo.toUpperCase() === flatNo.toUpperCase() && u.password === password);
       
-      if (predefined) {
-        if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-login-credentials') {
-          try {
-            // Try to create user if not found
-            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-            const docRef = doc(db, 'flats', flatNo.toLowerCase());
-            const docSnap = await getDoc(docRef);
-            if (!docSnap.exists()) {
-              await setDoc(docRef, {
-                flatNo: predefined.flatNo,
-                role: predefined.role
-              });
-            }
-            setUser(userCredential.user);
-            return;
-          } catch (bootstrapErr: any) {
-            if (bootstrapErr.code === 'auth/email-already-in-use') {
-              // User exists but password might be wrong or some other issue
-              setAuthError("Incorrect password for this flat.");
-            } else {
-              console.error("Bootstrap error:", bootstrapErr);
-              setAuthError("Failed to initialize user account.");
-            }
-            return;
+      if (predefined && (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-login-credentials')) {
+        try {
+          const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+          const docRef = doc(db, 'flats', flatNo.toLowerCase());
+          const docSnap = await getDoc(docRef);
+          if (!docSnap.exists()) {
+            await setDoc(docRef, {
+              flatNo: predefined.flatNo,
+              role: predefined.role
+            });
           }
+          setUser(userCredential.user);
+          return;
+        } catch (bootstrapErr: any) {
+          console.error("Bootstrap error:", bootstrapErr);
+          setAuthError("Failed to initialize predefined user.");
+          return;
         }
       }
 
       if (err.code === 'auth/operation-not-allowed') {
         setAuthError("Email/Password login is not enabled in Firebase Console.");
-      } else if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-login-credentials') {
-        setAuthError("Invalid Flat Number or Password.");
       } else {
-        setAuthError(err.message || "An error occurred during login.");
+        setAuthError("Invalid Flat Number or Password.");
       }
     }
   };
@@ -343,8 +245,8 @@ function Dashboard() {
     setDeletingId(null);
     try {
       await deleteDoc(doc(db, 'transactions', id));
-    } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `transactions/${id}`);
+    } catch (err) {
+      console.error("Delete error:", err);
     }
   };
 
@@ -515,83 +417,6 @@ function Dashboard() {
 
   const COLORS = ['#5A5A40', '#8E8E6B', '#C2C296', '#E6E6D1', '#A3A375', '#70704F'];
 
-  const handlePasskeyLogin = async () => {
-    try {
-      if (!loginFlatNo) {
-        setAuthError("Please enter your Flat Number first.");
-        return;
-      }
-
-      const email = `${loginFlatNo.toLowerCase()}@building.local`;
-
-      // 1. Get options from server
-      const optionsRes = await fetch("/api/auth/login/options", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email })
-      });
-      
-      if (!optionsRes.ok) {
-        const errData = await optionsRes.json();
-        throw new Error(errData.error || "Failed to get login options");
-      }
-      const options = await optionsRes.json();
-
-      // 2. Convert options for navigator.credentials.get
-      const publicKeyCredentialRequestOptions: PublicKeyCredentialRequestOptions = {
-        ...options,
-        challenge: Uint8Array.from(atob(options.challenge), c => c.charCodeAt(0)),
-        allowCredentials: options.allowCredentials.map((cred: any) => ({
-          ...cred,
-          id: Uint8Array.from(atob(cred.id), c => c.charCodeAt(0))
-        }))
-      };
-
-      const credential = await navigator.credentials.get({
-        publicKey: publicKeyCredentialRequestOptions
-      }) as any;
-
-      if (credential) {
-        // 3. Verify with server
-        const verifyRes = await fetch("/api/auth/login/verify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            email,
-            assertionResponse: {
-              id: credential.id,
-              rawId: btoa(String.fromCharCode(...new Uint8Array(credential.rawId))),
-              response: {
-                authenticatorData: btoa(String.fromCharCode(...new Uint8Array(credential.response.authenticatorData))),
-                clientDataJSON: btoa(String.fromCharCode(...new Uint8Array(credential.response.clientDataJSON))),
-                signature: btoa(String.fromCharCode(...new Uint8Array(credential.response.signature))),
-                userHandle: credential.response.userHandle ? btoa(String.fromCharCode(...new Uint8Array(credential.response.userHandle))) : null
-              }
-            }
-          })
-        });
-
-        if (!verifyRes.ok) {
-          const errData = await verifyRes.json();
-          throw new Error(errData.error || "Failed to verify passkey login");
-        }
-
-        const verifyData = await verifyRes.json();
-        const { customToken } = verifyData;
-
-        // 4. Sign in with Firebase Custom Token
-        await signInWithCustomToken(auth, customToken);
-      }
-    } catch (err: any) {
-      console.error("Error during passkey login:", err);
-      if (err.name === 'NotAllowedError' || err.message.includes('Permissions Policy')) {
-        setAuthError("Passkeys are restricted in this preview window. Please open the app in a new tab to sign in with a passkey.");
-      } else {
-        setAuthError(err.message || "Failed to sign in with passkey.");
-      }
-    }
-  };
-
   if (!user && !loading) {
     return (
       <div className="min-h-screen bg-[#F5F5F0] flex items-center justify-center p-4">
@@ -616,8 +441,6 @@ function Dashboard() {
                 <input 
                   name="flatNo"
                   required
-                  value={loginFlatNo}
-                  onChange={(e) => setLoginFlatNo(e.target.value)}
                   placeholder={t('login.flatNoPlaceholder')}
                   className="w-full pl-12 pr-4 py-3 bg-[#F5F5F0] border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40]/20 outline-none transition-all"
                 />
@@ -630,18 +453,11 @@ function Dashboard() {
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#5A5A40]/40" />
                 <input 
                   name="password"
-                  type={showPassword ? "text" : "password"}
+                  type="password"
                   required
                   placeholder={t('login.passwordPlaceholder')}
-                  className="w-full pl-12 pr-12 py-3 bg-[#F5F5F0] border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40]/20 outline-none transition-all"
+                  className="w-full pl-12 pr-4 py-3 bg-[#F5F5F0] border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40]/20 outline-none transition-all"
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 p-1 text-[#5A5A40]/40 hover:text-[#5A5A40] transition-colors"
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
               </div>
             </div>
 
@@ -660,25 +476,6 @@ function Dashboard() {
             </button>
           </form>
 
-          <div className="mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-black/5"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-[#5A5A40]/60">Or continue with</span>
-              </div>
-            </div>
-
-            <button
-              onClick={handlePasskeyLogin}
-              className="mt-6 w-full flex items-center justify-center gap-2 bg-[#F5F5F0] text-[#1A1A1A] py-4 rounded-full font-medium hover:bg-[#EAEAE0] transition-colors border border-black/5"
-            >
-              <Fingerprint className="w-5 h-5 text-[#5A5A40]" />
-              Sign in with Passkey
-            </button>
-          </div>
-
           <div className="mt-8 pt-6 border-t border-black/5 text-center space-y-4">
             <p className="text-xs text-[#5A5A40]/40 uppercase tracking-tighter">
               {t('login.authorized')}
@@ -687,12 +484,12 @@ function Dashboard() {
               <p className="text-sm font-serif text-[#5A5A40]">Made by Manthan - F602</p>
               <div className="flex flex-col items-center gap-2">
                 <a 
-                  href={window.location.href} 
+                  href="https://manthank.com" 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="text-xs font-bold uppercase tracking-widest text-white bg-[#5A5A40] px-4 py-2 rounded-full hover:bg-[#4A4A30] transition-colors"
                 >
-                  Open in New Tab
+                  Visit Website
                 </a>
                 <p className="text-xs text-[#5A5A40]/60 mt-2">If any issue, contact dev@manthank.com</p>
                 <a 
@@ -734,12 +531,6 @@ function Dashboard() {
             >
               {language === 'en' ? 'GU' : 'EN'}
             </button>
-            <Link 
-              to="/profile" 
-              className="p-2 hover:bg-[#F5F5F0] rounded-full transition-colors text-[#5A5A40]"
-            >
-              <UserIcon className="w-5 h-5" />
-            </Link>
             {flatInfo?.role === 'admin' && (
               <Link 
                 to="/adminpanel" 
@@ -811,34 +602,6 @@ function Dashboard() {
             </>
           )}
         </div>
-
-        <div className="flex justify-center">
-          <InstallPWA />
-        </div>
-
-        {/* Notices Section */}
-        {notices.length > 0 && (
-          <div className="bg-white p-6 rounded-[32px] shadow-sm border border-[#5A5A40]/10 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-1 h-full bg-[#5A5A40]" />
-            <h3 className="text-xl font-serif mb-4 flex items-center gap-2">
-              <AlertCircle className="w-5 h-5 text-[#5A5A40]" />
-              Building Notices
-            </h3>
-            <div className="space-y-4">
-              {notices.map((notice) => (
-                <div key={notice.id} className="p-4 bg-[#F5F5F0] rounded-2xl">
-                  <div className="flex justify-between items-start mb-2">
-                    <h4 className="font-medium text-[#1A1A1A]">{notice.title}</h4>
-                    <span className="text-[10px] uppercase tracking-widest font-bold text-[#5A5A40]/40">
-                      {notice.createdAt?.toDate ? notice.createdAt.toDate().toLocaleDateString() : 'Just now'}
-                    </span>
-                  </div>
-                  <p className="text-sm text-[#5A5A40]/80 whitespace-pre-wrap">{notice.content}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Actions & List */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -928,34 +691,24 @@ function Dashboard() {
                       exit={{ opacity: 0, x: 20 }}
                       whileHover={{ x: 5 }}
                       transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                      className="bg-white p-5 rounded-2xl shadow-sm border border-black/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group"
+                      className="bg-white p-5 rounded-2xl shadow-sm border border-black/5 flex items-center justify-between group"
                     >
-                      <div className="flex items-center justify-between w-full sm:w-auto gap-4">
-                        <div className="flex items-center gap-4">
-                          <div className={cn(
-                            "w-12 h-12 rounded-xl flex items-center justify-center shrink-0",
-                            t.type === 'income' ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
-                          )}>
-                            {t.type === 'income' ? <TrendingUp className="w-6 h-6" /> : <TrendingDown className="w-6 h-6" />}
-                          </div>
-                          <div>
-                            <h4 className="font-medium text-[#1A1A1A]">{t.category}</h4>
-                            <p className="text-xs text-[#5A5A40]/60">
-                              {t.date ? format(t.date.toDate(), 'MMM d, yyyy • h:mm a') : 'Processing...'}
-                            </p>
-                          </div>
+                      <div className="flex items-center gap-4">
+                        <div className={cn(
+                          "w-12 h-12 rounded-xl flex items-center justify-center",
+                          t.type === 'income' ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
+                        )}>
+                          {t.type === 'income' ? <TrendingUp className="w-6 h-6" /> : <TrendingDown className="w-6 h-6" />}
                         </div>
-                        <div className="sm:hidden text-right">
-                          <p className={cn(
-                            "font-serif text-lg",
-                            t.type === 'income' ? "text-emerald-600" : "text-rose-600"
-                          )}>
-                            {t.type === 'income' ? '+' : '-'} ₹{t.amount.toLocaleString()}
+                        <div>
+                          <h4 className="font-medium text-[#1A1A1A]">{t.category}</h4>
+                          <p className="text-xs text-[#5A5A40]/60">
+                            {t.date ? format(t.date.toDate(), 'MMM d, yyyy • h:mm a') : 'Processing...'}
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-6 border-t sm:border-none pt-4 sm:pt-0">
-                        <div className="hidden sm:block text-right">
+                      <div className="flex items-center gap-6">
+                        <div className="text-right">
                           <p className={cn(
                             "font-serif text-lg",
                             t.type === 'income' ? "text-emerald-600" : "text-rose-600"
@@ -966,32 +719,15 @@ function Dashboard() {
                             By {t.createdBy}
                           </p>
                         </div>
-                        <div className="sm:hidden">
-                          <p className="text-[10px] uppercase tracking-widest text-[#5A5A40]/40 font-medium">
-                            By {t.createdBy}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
+                        {flatInfo?.role === 'admin' && (
                           <button 
-                            onClick={() => setSelectedTransactionForComments(t)}
-                            className="relative p-2 text-[#5A5A40]/60 hover:text-[#5A5A40] hover:bg-[#F5F5F0] rounded-full transition-all"
-                            title="View Comments"
+                            onClick={() => setDeletingId(t.id)}
+                            className="p-2 text-rose-600/60 hover:text-rose-600 hover:bg-rose-50 rounded-full transition-all"
+                            title="Delete Transaction"
                           >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-message-circle"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>
-                            {t.commentCount && t.commentCount > 0 && (
-                              <span className="absolute top-1 right-1 w-2 h-2 bg-rose-500 rounded-full border border-white" />
-                            )}
+                            <Trash2 className="w-4 h-4" />
                           </button>
-                          {flatInfo?.role === 'admin' && (
-                            <button 
-                              onClick={() => setDeletingId(t.id)}
-                              className="p-2 text-rose-600/60 hover:text-rose-600 hover:bg-rose-50 rounded-full transition-all"
-                              title="Delete Transaction"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
+                        )}
                       </div>
                     </motion.div>
                   ))
@@ -1131,10 +867,6 @@ function Dashboard() {
                   : t('dash.healthBad')}
               </p>
             </div>
-
-            <div className="mt-4">
-              <InstallPWA />
-            </div>
           </div>
         </div>
       </main>
@@ -1198,18 +930,9 @@ function Dashboard() {
                   setIsAdding(false);
                   try {
                     await addDoc(collection(db, 'transactions'), data);
-                    // Trigger notification
-                    fetch('/api/notify', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        title: `New ${data.type === 'income' ? 'Income' : 'Expense'}`,
-                        message: `${data.description || data.category}: ₹${data.amount} by ${data.createdBy}`,
-                        url: window.location.origin
-                      })
-                    }).catch(err => console.error("Notification error:", err));
-                  } catch (error) {
-                    handleFirestoreError(error, OperationType.CREATE, 'transactions');
+                  } catch (err) {
+                    console.error("Error adding transaction:", err);
+                    alert(t('tx.error'));
                   }
                 }}
                 className="space-y-6"
@@ -1249,7 +972,7 @@ function Dashboard() {
                       required
                       className="w-full px-4 py-3 bg-[#F5F5F0] border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40]/20 outline-none appearance-none"
                     >
-                      {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                      {CATEGORIES.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                     </select>
                   </div>
                 </div>
@@ -1415,85 +1138,20 @@ function Dashboard() {
           </div>
         )}
       </AnimatePresence>
-
-      {/* Comments Modal */}
-      <AnimatePresence>
-        {selectedTransactionForComments && flatInfo && (
-          <CommentsModal
-            transactionId={selectedTransactionForComments.id}
-            transactionTitle={selectedTransactionForComments.description || selectedTransactionForComments.category}
-            currentUserFlatNo={flatInfo.flatNo}
-            currentUserRole={flatInfo.role}
-            onClose={() => setSelectedTransactionForComments(null)}
-          />
-        )}
-      </AnimatePresence>
     </div>
   );
 }
 
-interface ErrorBoundaryProps {
-  children: React.ReactNode;
-}
-
-interface ErrorBoundaryState {
-  hasError: boolean;
-  error: any;
-}
-
-class ErrorBoundary extends (Component as any) {
-  constructor(props: ErrorBoundaryProps) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-
-  static getDerivedStateFromError(error: any): ErrorBoundaryState {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error: any, errorInfo: any) {
-    console.error("ErrorBoundary caught an error", error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="min-h-screen flex items-center justify-center bg-[#F5F5F0] p-4 text-black">
-          <div className="bg-white p-8 rounded-[32px] shadow-xl max-w-md w-full text-center">
-            <h2 className="text-2xl font-serif mb-4">Something went wrong</h2>
-            <p className="text-gray-600 mb-6">
-              {this.state.error?.message?.startsWith('{') 
-                ? "A database error occurred. The developers have been notified."
-                : "An unexpected error occurred. Please try refreshing the page."}
-            </p>
-            <button 
-              onClick={() => window.location.reload()}
-              className="w-full py-4 bg-black text-white rounded-2xl font-medium hover:bg-zinc-800 transition-all"
-            >
-              Refresh Page
-            </button>
-          </div>
-        </div>
-      );
-    }
-
-    return (this.props as any).children;
-  }
-}
-
 export default function App() {
   return (
-    <ErrorBoundary>
-      <LanguageProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/adminpanel" element={<AdminPanel />} />
-            <Route path="/profile" element={<Profile />} />
-          </Routes>
-          <InstallPWA />
-        </BrowserRouter>
-      </LanguageProvider>
-    </ErrorBoundary>
+    <LanguageProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/adminpanel" element={<AdminPanel />} />
+        </Routes>
+        <InstallPWA />
+      </BrowserRouter>
+    </LanguageProvider>
   );
 }

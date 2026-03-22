@@ -56,17 +56,19 @@ export function InstallPWA() {
     setIsInstallable(false);
   };
 
-  if (!isInstallable) {
+  if (!isInstallable || location.pathname !== '/adminpanel') {
     return null;
   }
 
   return (
-    <button
-      onClick={handleInstallClick}
-      className="flex items-center justify-center gap-2 bg-white/10 text-white px-6 py-3 rounded-2xl font-medium hover:bg-white/20 transition-all w-full text-xs font-bold uppercase tracking-widest"
-    >
-      <Download className="w-4 h-4" />
-      {t('pwa.install')}
-    </button>
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
+      <button
+        onClick={handleInstallClick}
+        className="flex items-center gap-2 bg-[#5A5A40] text-white px-6 py-3 rounded-full font-medium shadow-lg shadow-[#5A5A40]/20 hover:bg-[#4A4A30] transition-all hover:-translate-y-1"
+      >
+        <Download className="w-5 h-5" />
+        {t('pwa.install')}
+      </button>
+    </div>
   );
 }
