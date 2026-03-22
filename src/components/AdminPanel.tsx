@@ -3,6 +3,7 @@ import {
   collection, 
   onSnapshot, 
   doc, 
+  getDoc,
   setDoc, 
   deleteDoc,
   query,
@@ -12,6 +13,8 @@ import { db, auth } from '../firebase';
 import { 
   onAuthStateChanged, 
   signOut,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
   User 
 } from 'firebase/auth';
 import { 
@@ -27,6 +30,9 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+
+import { useLanguage } from '../contexts/LanguageContext';
+import { Link } from 'react-router-dom';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -49,10 +55,28 @@ export function AdminPanel() {
   const [flats, setFlats] = useState<Flat[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
+  const [addError, setAddError] = useState("");
+
+  const { t, language, setLanguage } = useLanguage();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
+    const unsubscribe = onAuthStateChanged(auth, async (u) => {
       setUser(u);
+      if (u && u.email) {
+        if (u.email === 'manthankansagra@gmail.com' || u.email === 'admin@building.local') {
+          setIsAuthorized(true);
+        } else {
+          try {
+            const flatId = u.email.split('@')[0];
+            const docSnap = await getDoc(doc(db, 'flats', flatId));
+            if (docSnap.exists() && docSnap.data().role === 'admin') {
+              setIsAuthorized(true);
+            }
+          } catch (err) {
+            console.error("Error checking admin status:", err);
+          }
+        }
+      }
     });
     return () => unsubscribe();
   }, []);
@@ -71,13 +95,35 @@ export function AdminPanel() {
     return () => unsubscribe();
   }, [isAuthorized]);
 
-  const handleAuthorize = (e: React.FormEvent) => {
+  const handleAuthorize = async (e: React.FormEvent) => {
     e.preventDefault();
     if (passwordInput === ADMIN_PASSWORD) {
-      setIsAuthorized(true);
-      setError("");
+      try {
+        await signInWithEmailAndPassword(auth, 'admin@building.local', ADMIN_PASSWORD);
+        setIsAuthorized(true);
+        setError("");
+      } catch (err: any) {
+        if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-login-credentials') {
+          try {
+            await createUserWithEmailAndPassword(auth, 'admin@building.local', ADMIN_PASSWORD);
+            await setDoc(doc(db, 'flats', 'admin'), {
+              flatNo: 'ADMIN',
+              role: 'admin',
+              password: ADMIN_PASSWORD
+            });
+            setIsAuthorized(true);
+            setError("");
+          } catch (createErr) {
+            console.error("Error creating admin user:", createErr);
+            setError(t('admin.errorAuth'));
+          }
+        } else {
+          console.error("Error signing in admin:", err);
+          setError(t('admin.errorAuth'));
+        }
+      }
     } else {
-      setError("Incorrect Admin Access Password.");
+      setError(t('admin.errorAuth'));
     }
   };
 
@@ -102,12 +148,16 @@ export function AdminPanel() {
 
   const addFlat = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setAddError("");
     const formData = new FormData(e.currentTarget);
     const flatNo = (formData.get('flatNo') as string).toUpperCase();
     const role = formData.get('role') as 'admin' | 'resident';
     const password = formData.get('password') as string;
 
     try {
+      if (!user) {
+        throw new Error("Not authenticated");
+      }
       await setDoc(doc(db, 'flats', flatNo.toLowerCase()), {
         flatNo,
         role,
@@ -116,6 +166,7 @@ export function AdminPanel() {
       setIsAdding(false);
     } catch (err) {
       console.error("Error adding flat:", err);
+      setAddError(t('admin.errorAdd'));
     }
   };
 
@@ -130,14 +181,14 @@ export function AdminPanel() {
           <div className="w-16 h-16 bg-[#5A5A40]/10 rounded-full flex items-center justify-center mx-auto mb-6">
             <Lock className="text-[#5A5A40] w-8 h-8" />
           </div>
-          <h2 className="text-3xl font-serif text-center mb-2">Admin Access</h2>
-          <p className="text-center text-[#5A5A40]/60 mb-8 text-sm">Enter the master password to manage users.</p>
+          <h2 className="text-3xl font-serif text-center mb-2">{t('admin.access')}</h2>
+          <p className="text-center text-[#5A5A40]/60 mb-8 text-sm">{t('admin.subtitle')}</p>
           
           <form onSubmit={handleAuthorize} className="space-y-6">
             <div>
               <input 
                 type="password"
-                placeholder="Master Password"
+                placeholder={t('admin.masterPass')}
                 value={passwordInput}
                 onChange={(e) => setPasswordInput(e.target.value)}
                 className="w-full px-6 py-4 bg-[#F5F5F0] border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40]/20 outline-none text-center text-lg tracking-widest"
@@ -149,15 +200,15 @@ export function AdminPanel() {
               type="submit"
               className="w-full bg-[#5A5A40] text-white py-4 rounded-full font-bold uppercase tracking-widest hover:bg-[#4A4A30] transition-all shadow-lg shadow-[#5A5A40]/20"
             >
-              Authorize
+              {t('admin.authorize')}
             </button>
           </form>
           
           <div className="mt-8 text-center">
-            <a href="/" className="text-[#5A5A40]/40 hover:text-[#5A5A40] text-xs font-medium flex items-center justify-center gap-2 transition-colors">
+            <Link to="/" className="text-[#5A5A40]/40 hover:text-[#5A5A40] text-xs font-medium flex items-center justify-center gap-2 transition-colors">
               <ArrowLeft className="w-3 h-3" />
-              Back to Dashboard
-            </a>
+              {t('admin.back')}
+            </Link>
           </div>
         </motion.div>
       </div>
@@ -174,14 +225,20 @@ export function AdminPanel() {
               <Shield className="text-white w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-xl font-serif">User Management</h1>
-              <p className="text-[10px] uppercase tracking-[0.2em] text-[#5A5A40]/40 font-bold">Admin Panel</p>
+              <h1 className="text-xl font-serif">{t('admin.title')}</h1>
+              <p className="text-[10px] uppercase tracking-[0.2em] text-[#5A5A40]/40 font-bold">{t('dash.adminPanel')}</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <a href="/" className="text-sm font-medium text-[#5A5A40]/60 hover:text-[#5A5A40] transition-colors">
-              Dashboard
-            </a>
+            <button
+              onClick={() => setLanguage(language === 'en' ? 'gu' : 'en')}
+              className="text-xs font-bold uppercase tracking-widest text-[#5A5A40]/60 hover:text-[#5A5A40] transition-colors"
+            >
+              {language === 'en' ? 'GU' : 'EN'}
+            </button>
+            <Link to="/" className="text-sm font-medium text-[#5A5A40]/60 hover:text-[#5A5A40] transition-colors">
+              {t('admin.back')}
+            </Link>
             <button 
               onClick={() => signOut(auth)}
               className="p-2 text-[#5A5A40]/40 hover:text-rose-500 transition-colors"
@@ -195,15 +252,15 @@ export function AdminPanel() {
       <main className="max-w-5xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h2 className="text-3xl font-serif">Flats & Residents</h2>
-            <p className="text-[#5A5A40]/60 text-sm">Manage access and roles for all building units.</p>
+            <h2 className="text-3xl font-serif">{t('admin.flats')}</h2>
+            <p className="text-[#5A5A40]/60 text-sm">{t('admin.manage')}</p>
           </div>
           <button 
             onClick={() => setIsAdding(true)}
             className="bg-[#5A5A40] text-white px-6 py-3 rounded-full font-medium flex items-center gap-2 hover:bg-[#4A4A30] transition-all shadow-lg shadow-[#5A5A40]/20"
           >
             <Plus className="w-5 h-5" />
-            Add Flat
+            <span className="hidden sm:inline">{t('admin.addFlat')}</span>
           </button>
         </div>
 
@@ -234,7 +291,7 @@ export function AdminPanel() {
                       <div>
                         <h3 className="text-xl font-serif">{flat.flatNo}</h3>
                         <p className="text-[10px] uppercase tracking-widest font-bold text-[#5A5A40]/40">
-                          {flat.role}
+                          {flat.role === 'admin' ? t('admin.admin') : t('admin.resident')}
                         </p>
                       </div>
                     </div>
@@ -248,7 +305,7 @@ export function AdminPanel() {
 
                   <div className="space-y-4">
                     <div className="bg-[#F5F5F0] p-4 rounded-2xl">
-                      <p className="text-[10px] uppercase tracking-widest text-[#5A5A40]/40 font-bold mb-1">Access Password</p>
+                      <p className="text-[10px] uppercase tracking-widest text-[#5A5A40]/40 font-bold mb-1">{t('admin.accessPass')}</p>
                       <p className="font-mono text-sm tracking-widest">{flat.password || '••••••••'}</p>
                     </div>
 
@@ -261,7 +318,7 @@ export function AdminPanel() {
                           : "border-[#5A5A40]/20 text-[#5A5A40] hover:bg-[#5A5A40] hover:text-white"
                       )}
                     >
-                      {flat.role === 'admin' ? "Demote to Resident" : "Promote to Admin"}
+                      {flat.role === 'admin' ? t('admin.demote') : t('admin.promote')}
                     </button>
                   </div>
                 </motion.div>
@@ -288,10 +345,17 @@ export function AdminPanel() {
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
               className="relative w-full max-w-md bg-white rounded-[32px] p-8 shadow-2xl"
             >
-              <h3 className="text-2xl font-serif mb-6">Add New Flat</h3>
+              <h3 className="text-2xl font-serif mb-6">{t('admin.addNew')}</h3>
+              
+              {addError && (
+                <div className="mb-6 p-4 bg-rose-50 text-rose-600 rounded-2xl text-sm font-medium">
+                  {addError}
+                </div>
+              )}
+
               <form onSubmit={addFlat} className="space-y-6">
                 <div>
-                  <label className="block text-xs uppercase tracking-widest text-[#5A5A40] mb-2 font-medium">Flat Number</label>
+                  <label className="block text-xs uppercase tracking-widest text-[#5A5A40] mb-2 font-medium">{t('login.flatNo')}</label>
                   <input 
                     name="flatNo"
                     type="text"
@@ -302,7 +366,7 @@ export function AdminPanel() {
                 </div>
 
                 <div>
-                  <label className="block text-xs uppercase tracking-widest text-[#5A5A40] mb-2 font-medium">Password</label>
+                  <label className="block text-xs uppercase tracking-widest text-[#5A5A40] mb-2 font-medium">{t('login.password')}</label>
                   <input 
                     name="password"
                     type="text"
@@ -313,18 +377,18 @@ export function AdminPanel() {
                 </div>
 
                 <div>
-                  <label className="block text-xs uppercase tracking-widest text-[#5A5A40] mb-2 font-medium">Initial Role</label>
+                  <label className="block text-xs uppercase tracking-widest text-[#5A5A40] mb-2 font-medium">{t('admin.initialRole')}</label>
                   <div className="flex gap-2 p-1 bg-[#F5F5F0] rounded-2xl">
                     <label className="flex-1 cursor-pointer">
                       <input type="radio" name="role" value="resident" defaultChecked className="peer sr-only" />
                       <div className="py-3 rounded-xl text-center text-xs font-bold uppercase tracking-widest transition-all peer-checked:bg-[#5A5A40] peer-checked:text-white text-[#5A5A40]/40">
-                        Resident
+                        {t('admin.resident')}
                       </div>
                     </label>
                     <label className="flex-1 cursor-pointer">
                       <input type="radio" name="role" value="admin" className="peer sr-only" />
                       <div className="py-3 rounded-xl text-center text-xs font-bold uppercase tracking-widest transition-all peer-checked:bg-[#5A5A40] peer-checked:text-white text-[#5A5A40]/40">
-                        Admin
+                        {t('admin.admin')}
                       </div>
                     </label>
                   </div>
@@ -336,13 +400,13 @@ export function AdminPanel() {
                     onClick={() => setIsAdding(false)}
                     className="flex-1 py-4 rounded-full font-medium text-[#5A5A40] bg-[#F5F5F0] hover:bg-black/5 transition-colors"
                   >
-                    Cancel
+                    {t('cancel')}
                   </button>
                   <button 
                     type="submit"
                     className="flex-1 bg-[#5A5A40] text-white py-4 rounded-full font-medium hover:bg-[#4A4A30] transition-colors"
                   >
-                    Save Flat
+                    {t('admin.saveFlat')}
                   </button>
                 </div>
               </form>

@@ -60,6 +60,7 @@ import {
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, startOfYear, endOfYear, eachMonthOfInterval, isSameMonth } from 'date-fns';
 import { BrowserRouter, Routes, Route, Link, useNavigate } from 'react-router-dom';
 import { AdminPanel } from './components/AdminPanel';
+import { LanguageProvider, useLanguage } from './contexts/LanguageContext';
 import { motion, AnimatePresence } from 'motion/react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -125,6 +126,7 @@ function Dashboard() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
 
   const navigate = useNavigate();
+  const { t, language, setLanguage } = useLanguage();
 
   const years = useMemo(() => {
     const uniqueYears = new Set<number>();
@@ -489,13 +491,13 @@ function Dashboard() {
             <div className="w-16 h-16 bg-[#5A5A40] rounded-full flex items-center justify-center mb-4">
               <Building2 className="text-white w-8 h-8" />
             </div>
-            <h1 className="text-3xl font-serif text-[#1A1A1A]">The Courtyard F wing</h1>
-            <p className="text-[#5A5A40]/60 font-serif italic text-center">Transparent Fund Management</p>
+            <h1 className="text-3xl font-serif text-[#1A1A1A]">{t('app.title')}</h1>
+            <p className="text-[#5A5A40]/60 font-serif italic text-center">{t('app.subtitle')}</p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-6">
             <div>
-              <label className="block text-xs uppercase tracking-widest text-[#5A5A40] mb-2 font-medium">Flat Number</label>
+              <label className="block text-xs uppercase tracking-widest text-[#5A5A40] mb-2 font-medium">{t('login.flatNo')}</label>
               <div className="relative">
                 <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#5A5A40]/40" />
                 <input 
@@ -508,7 +510,7 @@ function Dashboard() {
             </div>
 
             <div>
-              <label className="block text-xs uppercase tracking-widest text-[#5A5A40] mb-2 font-medium">Password</label>
+              <label className="block text-xs uppercase tracking-widest text-[#5A5A40] mb-2 font-medium">{t('login.password')}</label>
               <div className="relative">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#5A5A40]/40" />
                 <input 
@@ -524,7 +526,7 @@ function Dashboard() {
             {authError && (
               <div className="flex items-center gap-2 text-red-600 text-sm bg-red-50 p-3 rounded-xl">
                 <AlertCircle className="w-4 h-4" />
-                {authError}
+                {t('login.invalid')}
               </div>
             )}
 
@@ -532,19 +534,19 @@ function Dashboard() {
               type="submit"
               className="w-full bg-[#5A5A40] text-white py-4 rounded-full font-medium hover:bg-[#4A4A30] transition-colors shadow-lg shadow-[#5A5A40]/20"
             >
-              Enter Dashboard
+              {t('login.enter')}
             </button>
           </form>
 
           <div className="mt-8 pt-6 border-t border-black/5 text-center space-y-4">
             <p className="text-xs text-[#5A5A40]/40 uppercase tracking-tighter">
-              Authorized Access Only
+              {t('login.authorized')}
             </p>
             <button 
               onClick={initializeDatabase}
               className="text-xs text-[#5A5A40]/60 hover:text-[#5A5A40] underline underline-offset-4"
             >
-              First time? Click here to setup database
+              {t('login.setup')}
             </button>
           </div>
         </motion.div>
@@ -562,20 +564,26 @@ function Dashboard() {
               <Building2 className="text-white w-5 h-5" />
             </div>
             <div>
-              <h2 className="font-serif text-lg leading-tight">The Courtyard F wing</h2>
+              <h2 className="font-serif text-lg leading-tight">{t('app.title')}</h2>
               <p className="text-xs text-[#5A5A40]/60 font-medium uppercase tracking-widest">
-                Flat {flatInfo?.flatNo} • {flatInfo?.role}
+                {t('login.flatNo')} {flatInfo?.flatNo} • {flatInfo?.role === 'admin' ? t('admin.admin') : t('admin.resident')}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-4">
+            <button
+              onClick={() => setLanguage(language === 'en' ? 'gu' : 'en')}
+              className="text-xs font-bold uppercase tracking-widest text-[#5A5A40]/60 hover:text-[#5A5A40] transition-colors"
+            >
+              {language === 'en' ? 'GU' : 'EN'}
+            </button>
             {flatInfo?.role === 'admin' && (
               <Link 
                 to="/adminpanel" 
                 className="hidden sm:flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[#5A5A40]/40 hover:text-[#5A5A40] transition-colors"
               >
                 <Shield className="w-4 h-4" />
-                Admin Panel
+                {t('dash.adminPanel')}
               </Link>
             )}
             <button 
@@ -778,15 +786,15 @@ function Dashboard() {
           <div className="space-y-6">
             <div className="bg-white p-6 rounded-[32px] shadow-sm border border-black/5">
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-serif">Analytics</h3>
+                <h3 className="text-lg font-serif">{t('chart.overview')}</h3>
                 <div className="flex gap-2">
                   <select 
                     value={chartView}
                     onChange={(e) => setChartView(e.target.value as any)}
                     className="text-xs bg-[#F5F5F0] border-none rounded-lg px-2 py-1 outline-none font-medium"
                   >
-                    <option value="pie">Pie Chart</option>
-                    <option value="line">Line Graph</option>
+                    <option value="pie">{t('chart.pie')}</option>
+                    <option value="line">{t('chart.line')}</option>
                   </select>
                 </div>
               </div>
@@ -800,7 +808,7 @@ function Dashboard() {
                       timeRange === 'monthly' ? "bg-[#5A5A40] text-white" : "bg-[#F5F5F0] text-[#5A5A40]/40"
                     )}
                   >
-                    Monthly
+                    {t('pdf.monthly')}
                   </button>
                   <button 
                     onClick={() => setTimeRange('yearly')}
@@ -809,7 +817,7 @@ function Dashboard() {
                       timeRange === 'yearly' ? "bg-[#5A5A40] text-white" : "bg-[#F5F5F0] text-[#5A5A40]/40"
                     )}
                   >
-                    Yearly
+                    {t('pdf.yearly')}
                   </button>
                 </div>
 
@@ -881,7 +889,7 @@ function Dashboard() {
                         stroke="#10B981" 
                         strokeWidth={2} 
                         dot={false} 
-                        name="Income"
+                        name={t('income')}
                       />
                       <Line 
                         type="monotone" 
@@ -889,7 +897,7 @@ function Dashboard() {
                         stroke="#EF4444" 
                         strokeWidth={2} 
                         dot={false} 
-                        name="Expense"
+                        name={t('expense')}
                       />
                     </LineChart>
                   )}
@@ -1037,7 +1045,7 @@ function Dashboard() {
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
               className="relative w-full max-w-md bg-white rounded-[32px] p-8 shadow-2xl"
             >
-              <h3 className="text-2xl font-serif mb-6">Generate Report</h3>
+              <h3 className="text-2xl font-serif mb-6">{t('pdf.generate')}</h3>
               
               <div className="space-y-6">
                 <div className="flex gap-2 p-1 bg-[#F5F5F0] rounded-2xl">
@@ -1048,7 +1056,7 @@ function Dashboard() {
                       exportType === 'monthly' ? "bg-[#5A5A40] text-white shadow-sm" : "text-[#5A5A40]/40"
                     )}
                   >
-                    Monthly
+                    {t('pdf.monthly')}
                   </button>
                   <button 
                     onClick={() => setExportType('yearly')}
@@ -1057,13 +1065,13 @@ function Dashboard() {
                       exportType === 'yearly' ? "bg-[#5A5A40] text-white shadow-sm" : "text-[#5A5A40]/40"
                     )}
                   >
-                    Yearly
+                    {t('pdf.yearly')}
                   </button>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs uppercase tracking-widest text-[#5A5A40] mb-2 font-medium">Year</label>
+                    <label className="block text-xs uppercase tracking-widest text-[#5A5A40] mb-2 font-medium">{t('pdf.year')}</label>
                     <select 
                       value={exportYear}
                       onChange={(e) => setExportYear(Number(e.target.value))}
@@ -1074,7 +1082,7 @@ function Dashboard() {
                   </div>
                   {exportType === 'monthly' && (
                     <div>
-                      <label className="block text-xs uppercase tracking-widest text-[#5A5A40] mb-2 font-medium">Month</label>
+                      <label className="block text-xs uppercase tracking-widest text-[#5A5A40] mb-2 font-medium">{t('pdf.month')}</label>
                       <select 
                         value={exportMonth}
                         onChange={(e) => setExportMonth(Number(e.target.value))}
@@ -1093,14 +1101,14 @@ function Dashboard() {
                     onClick={() => setIsExportModalOpen(false)}
                     className="flex-1 py-4 rounded-full font-medium text-[#5A5A40] bg-[#F5F5F0] hover:bg-black/5 transition-colors"
                   >
-                    Cancel
+                    {t('cancel')}
                   </button>
                   <button 
                     onClick={() => exportToPDF(exportType, exportYear, exportMonth)}
                     className="flex-1 bg-[#5A5A40] text-white py-4 rounded-full font-medium hover:bg-[#4A4A30] transition-colors flex items-center justify-center gap-2"
                   >
                     <Download className="w-4 h-4" />
-                    Download
+                    {t('pdf.download')}
                   </button>
                 </div>
               </div>
@@ -1129,22 +1137,22 @@ function Dashboard() {
               <div className="w-16 h-16 bg-rose-50 rounded-full flex items-center justify-center mx-auto mb-4">
                 <AlertCircle className="text-rose-600 w-8 h-8" />
               </div>
-              <h3 className="text-xl font-serif mb-2">Delete Entry?</h3>
+              <h3 className="text-xl font-serif mb-2">{t('del.title')}</h3>
               <p className="text-sm text-[#5A5A40]/60 mb-8">
-                This action cannot be undone. Are you sure you want to remove this transaction?
+                {t('del.desc')}
               </p>
               <div className="flex gap-4">
                 <button 
                   onClick={() => setDeletingId(null)}
                   className="flex-1 py-3 rounded-full font-medium text-[#5A5A40] bg-[#F5F5F0] hover:bg-black/5 transition-colors"
                 >
-                  Cancel
+                  {t('cancel')}
                 </button>
                 <button 
                   onClick={() => handleDelete(deletingId)}
                   className="flex-1 bg-rose-600 text-white py-3 rounded-full font-medium hover:bg-rose-700 transition-colors"
                 >
-                  Delete
+                  {t('del.confirm')}
                 </button>
               </div>
             </motion.div>
@@ -1157,11 +1165,13 @@ function Dashboard() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/adminpanel" element={<AdminPanel />} />
-      </Routes>
-    </BrowserRouter>
+    <LanguageProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/adminpanel" element={<AdminPanel />} />
+        </Routes>
+      </BrowserRouter>
+    </LanguageProvider>
   );
 }
