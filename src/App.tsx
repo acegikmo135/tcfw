@@ -185,12 +185,14 @@ function Dashboard() {
   // OneSignal initialization
   useEffect(() => {
     const initOneSignal = async () => {
-      const appId = process.env.VITE_ONESIGNAL_APP_ID;
+      const appId = import.meta.env.VITE_ONESIGNAL_APP_ID;
       if (!appId) return;
       try {
         await OneSignal.init({
           appId,
           allowLocalhostAsSecureOrigin: true,
+          serviceWorkerParam: { scope: '/' },
+          serviceWorkerPath: 'OneSignalSDKWorker.js',
         });
         OneSignal.Slidedown.promptPush();
       } catch (e) {

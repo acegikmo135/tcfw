@@ -66,9 +66,9 @@ async function sendNotification(title: string, message: string, data?: any) {
   }
 }
 
-const f2l = new Fido2Lib({
+const getF2L = (hostname: string) => new Fido2Lib({
   timeout: 60000,
-  rpId: process.env.APP_URL ? new URL(process.env.APP_URL).hostname : "localhost",
+  rpId: hostname,
   rpName: "Society Management App",
   challengeSize: 128,
   attestation: "none",
@@ -91,17 +91,30 @@ async function startServer() {
       const { email } = req.body;
       if (!email) return res.status(400).json({ error: "Email required" });
 
+      const hostname = process.env.APP_URL ? new URL(process.env.APP_URL).hostname : req.get('host') || "localhost";
+      const f2l = getF2L(hostname);
       const registrationOptions = await f2l.attestationOptions();
       
-      // Store challenge in cookie
-      res.cookie("registrationChallenge", registrationOptions.challenge, {
+      // Store challenge in cookie as base64
+      const challengeBase64 = Buffer.from(registrationOptions.challenge).toString("base64");
+      res.cookie("registrationChallenge", challengeBase64, {
         httpOnly: true,
         secure: true,
         sameSite: "none",
         maxAge: 60000
       });
 
-      res.json(registrationOptions);
+      // Convert Uint8Array to base64 for JSON
+      const options = {
+        ...registrationOptions,
+        challenge: challengeBase64,
+        user: {
+          ...registrationOptions.user,
+          id: Buffer.from(registrationOptions.user.id).toString("base64")
+        }
+      };
+
+      res.json(options);
     } catch (error) {
       console.error("Registration options error:", error);
       res.status(500).json({ error: "Failed to get registration options" });
@@ -112,9 +125,9 @@ async function startServer() {
   app.post("/api/auth/register/verify", async (req, res) => {
     try {
       const { email, attestationResponse, flatId } = req.body;
-      const challenge = req.cookies.registrationChallenge;
+      const challengeBase64 = req.cookies.registrationChallenge;
 
-      if (!challenge) return res.status(400).json({ error: "Challenge expired" });
+      if (!challengeBase64) return res.status(400).json({ error: "Challenge expired" });
 
       const clientAttestationResponse = {
         id: attestationResponse.id,
@@ -125,9 +138,12 @@ async function startServer() {
         }
       };
 
+      const hostname = process.env.APP_URL ? new URL(process.env.APP_URL).hostname : req.get('host') || "localhost";
+      const origin = process.env.APP_URL ? new URL(process.env.APP_URL).origin : `https://${req.get('host')}`;
+      const f2l = getF2L(hostname);
       const regResult = await f2l.attestationResult(clientAttestationResponse, {
-        challenge: challenge,
-        origin: process.env.APP_URL || "http://localhost:3000",
+        challenge: challengeBase64,
+        origin: origin,
         factor: "either"
       });
 
@@ -165,10 +181,13 @@ async function startServer() {
       const flatData = flatsSnapshot.docs[0].data();
       if (!flatData.passkeyId) return res.status(400).json({ error: "Passkey not registered" });
 
+      const hostname = process.env.APP_URL ? new URL(process.env.APP_URL).hostname : req.get('host') || "localhost";
+      const f2l = getF2L(hostname);
       const assertionOptions = await f2l.assertionOptions();
       
-      // Store challenge in cookie
-      res.cookie("loginChallenge", assertionOptions.challenge, {
+      // Store challenge in cookie as base64
+      const challengeBase64 = Buffer.from(assertionOptions.challenge).toString("base64");
+      res.cookie("loginChallenge", challengeBase64, {
         httpOnly: true,
         secure: true,
         sameSite: "none",
@@ -177,6 +196,7 @@ async function startServer() {
 
       res.json({
         ...assertionOptions,
+        challenge: challengeBase64,
         allowCredentials: [{
           id: flatData.passkeyId,
           type: "public-key",
@@ -193,9 +213,9 @@ async function startServer() {
   app.post("/api/auth/login/verify", async (req, res) => {
     try {
       const { email, assertionResponse } = req.body;
-      const challenge = req.cookies.loginChallenge;
+      const challengeBase64 = req.cookies.loginChallenge;
 
-      if (!challenge) return res.status(400).json({ error: "Challenge expired" });
+      if (!challengeBase64) return res.status(400).json({ error: "Challenge expired" });
 
       // Find flat by email
       const flatsSnapshot = await db.collection("flats").where("email", "==", email).limit(1).get();
@@ -215,9 +235,12 @@ async function startServer() {
         }
       };
 
+      const hostname = process.env.APP_URL ? new URL(process.env.APP_URL).hostname : req.get('host') || "localhost";
+      const origin = process.env.APP_URL ? new URL(process.env.APP_URL).origin : `https://${req.get('host')}`;
+      const f2l = getF2L(hostname);
       const expectAssertionResult = await f2l.assertionResult(clientAssertionResponse, {
-        challenge: challenge,
-        origin: process.env.APP_URL || "http://localhost:3000",
+        challenge: challengeBase64,
+        origin: origin,
         factor: "either",
         publicKey: (new Uint8Array(Buffer.from(flatData.publicKey, "base64")).buffer as any),
         prevCounter: flatData.counter,

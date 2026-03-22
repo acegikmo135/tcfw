@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { auth, db, handleFirestoreError, OperationType } from '../firebase';
+import { auth, db } from '../firebase';
 import { updatePassword, updateProfile, User } from 'firebase/auth';
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import { motion } from 'motion/react';
@@ -27,13 +27,8 @@ export function Profile() {
         try {
           const flatId = currentUser.email?.split('@')[0] || '';
           if (flatId) {
-            let flatDoc;
-            try {
-              flatDoc = await getDoc(doc(db, 'flats', flatId));
-            } catch (error) {
-              handleFirestoreError(error, OperationType.GET, `flats/${flatId}`);
-            }
-            if (flatDoc && flatDoc.exists()) {
+            const flatDoc = await getDoc(doc(db, 'flats', flatId));
+            if (flatDoc.exists()) {
               if (flatDoc.data().name) setName(flatDoc.data().name);
               if (flatDoc.data().passkeyEnabled) setHasPasskey(true);
             }
@@ -65,11 +60,7 @@ export function Profile() {
         // Update Firestore
         const flatId = user.email?.split('@')[0] || '';
         if (flatId) {
-          try {
-            await updateDoc(doc(db, 'flats', flatId), { name });
-          } catch (error) {
-            handleFirestoreError(error, OperationType.UPDATE, `flats/${flatId}`);
-          }
+          await updateDoc(doc(db, 'flats', flatId), { name });
         }
       }
 
@@ -115,7 +106,7 @@ export function Profile() {
         challenge: Uint8Array.from(atob(options.challenge), (c: string) => c.charCodeAt(0)),
         user: {
           ...options.user,
-          id: Uint8Array.from(options.user.id, (c: string) => c.charCodeAt(0))
+          id: Uint8Array.from(atob(options.user.id), (c: string) => c.charCodeAt(0))
         }
       };
 
