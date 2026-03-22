@@ -17,12 +17,13 @@ export default defineConfig(({mode}) => {
           enabled: true
         },
         manifest: {
-          name: 'The Courtyard F Wing',
-          short_name: 'Courtyard F',
+          name: 'Courtyard F Admin',
+          short_name: 'Courtyard F Admin',
           description: 'Transparent Fund Management',
           theme_color: '#5A5A40',
           background_color: '#F5F5F0',
           display: 'standalone',
+          start_url: '/adminpanel',
           icons: [
             {
               src: 'https://raw.githubusercontent.com/acegikmo135/assets/main/vbub4efh.jpg',
