@@ -28,6 +28,8 @@ const translations = {
     "login.authorized": "Authorized Access Only",
     "login.setup": "First time? Click here to setup database",
     "login.invalid": "Invalid Flat Number or Password.",
+    "login.flatNoPlaceholder": "e.g. F601",
+    "login.passwordPlaceholder": "••••••••",
     
     // Dashboard
     "dash.totalBalance": "Total Balance",
@@ -37,14 +39,19 @@ const translations = {
     "dash.adminPanel": "Admin Panel",
     "dash.search": "Search transactions...",
     "dash.noTransactions": "No transactions found.",
+    "dash.health": "Financial Health",
+    "dash.healthGood": "The building fund is healthy. We have a positive surplus for future maintenance.",
+    "dash.healthBad": "The building fund is currently in deficit. Please ensure all dues are cleared.",
     
     // Transaction Modal
     "tx.new": "New Transaction",
     "tx.type": "Type",
     "tx.amount": "Amount",
     "tx.category": "Category",
-    "tx.description": "Description (Optional)",
-    "tx.save": "Save Transaction",
+    "tx.description": "Description",
+    "tx.descPlaceholder": "Brief details...",
+    "tx.save": "Save Entry",
+    "tx.error": "Failed to add transaction. Check permissions.",
     
     // Admin Panel
     "admin.access": "Admin Access",
@@ -65,13 +72,35 @@ const translations = {
     "admin.admin": "Admin",
     "admin.saveFlat": "Save Flat",
     "admin.errorAuth": "Incorrect Admin Access Password.",
+    "admin.errorAdd": "Failed to add flat. Check permissions.",
+    "admin.errorRequired": "Flat number and password are required.",
+    "admin.deleteConfirm": "Are you sure you want to delete flat {id}?",
+    "admin.flatNoPlaceholder": "e.g. F601",
+    "admin.passwordPlaceholder": "Set access password",
+    
     // PDF Export
     "pdf.generate": "Generate Report",
+    "pdf.title": "The Courtyard F wing - Fund Report",
     "pdf.monthly": "Monthly",
     "pdf.yearly": "Yearly",
     "pdf.year": "Year",
     "pdf.month": "Month",
     "pdf.download": "Download",
+    "pdf.generatedOn": "Generated on",
+    "pdf.totalIncome": "Total Income",
+    "pdf.totalExpense": "Total Expense",
+    "pdf.netBalance": "Net Balance",
+    "pdf.date": "Date",
+    "pdf.type": "Type",
+    "pdf.category": "Category",
+    "pdf.desc": "Description",
+    "pdf.amount": "Amount",
+    "pdf.by": "By",
+    "pdf.pending": "Pending",
+    
+    // Initialization
+    "init.success": "Database initialized successfully! You can now login.",
+    "init.fail": "Initialization failed:",
     
     // Delete Modal
     "del.title": "Delete Entry?",
@@ -82,7 +111,10 @@ const translations = {
     "chart.overview": "Financial Overview",
     "chart.pie": "Category View",
     "chart.line": "Trend View",
-    "chart.noData": "No data available for this period."
+    "chart.noData": "No data available for this period.",
+    
+    // PWA
+    "pwa.install": "Install App"
   },
   gu: {
     // General
@@ -103,6 +135,8 @@ const translations = {
     "login.authorized": "ફક્ત અધિકૃત પ્રવેશ",
     "login.setup": "પ્રથમ વખત? ડેટાબેઝ સેટ કરવા માટે અહીં ક્લિક કરો",
     "login.invalid": "અમાન્ય ફ્લેટ નંબર અથવા પાસવર્ડ.",
+    "login.flatNoPlaceholder": "દા.ત. F601",
+    "login.passwordPlaceholder": "••••••••",
     
     // Dashboard
     "dash.totalBalance": "કુલ બેલેન્સ",
@@ -112,14 +146,19 @@ const translations = {
     "dash.adminPanel": "એડમિન પેનલ",
     "dash.search": "વ્યવહારો શોધો...",
     "dash.noTransactions": "કોઈ વ્યવહાર મળ્યો નથી.",
+    "dash.health": "નાણાકીય આરોગ્ય",
+    "dash.healthGood": "બિલ્ડિંગ ફંડ સ્વસ્થ છે. ભવિષ્યની જાળવણી માટે આપણી પાસે સકારાત્મક સરપ્લસ છે.",
+    "dash.healthBad": "બિલ્ડિંગ ફંડ હાલમાં ખાધમાં છે. કૃપા કરીને ખાતરી કરો કે તમામ બાકી રકમ ચૂકવવામાં આવી છે.",
     
     // Transaction Modal
     "tx.new": "નવો વ્યવહાર",
     "tx.type": "પ્રકાર",
     "tx.amount": "રકમ",
     "tx.category": "શ્રેણી",
-    "tx.description": "વર્ણન (વૈકલ્પિક)",
+    "tx.description": "વર્ણન",
+    "tx.descPlaceholder": "ટૂંકી વિગતો...",
     "tx.save": "વ્યવહાર સાચવો",
+    "tx.error": "વ્યવહાર ઉમેરવામાં નિષ્ફળ. પરવાનગીઓ તપાસો.",
     
     // Admin Panel
     "admin.access": "એડમિન પ્રવેશ",
@@ -140,13 +179,35 @@ const translations = {
     "admin.admin": "એડમિન",
     "admin.saveFlat": "ફ્લેટ સાચવો",
     "admin.errorAuth": "ખોટો એડમિન ઍક્સેસ પાસવર્ડ.",
+    "admin.errorAdd": "ફ્લેટ ઉમેરવામાં નિષ્ફળ. પરવાનગીઓ તપાસો.",
+    "admin.errorRequired": "ફ્લેટ નંબર અને પાસવર્ડ જરૂરી છે.",
+    "admin.deleteConfirm": "શું તમે ખરેખર ફ્લેટ {id} કાઢી નાખવા માંગો છો?",
+    "admin.flatNoPlaceholder": "દા.ત. F601",
+    "admin.passwordPlaceholder": "ઍક્સેસ પાસવર્ડ સેટ કરો",
+    
     // PDF Export
     "pdf.generate": "રિપોર્ટ બનાવો",
+    "pdf.title": "ધ કોર્ટયાર્ડ F વિંગ - ફંડ રિપોર્ટ",
     "pdf.monthly": "માસિક",
     "pdf.yearly": "વાર્ષિક",
     "pdf.year": "વર્ષ",
     "pdf.month": "મહિનો",
     "pdf.download": "ડાઉનલોડ કરો",
+    "pdf.generatedOn": "બનાવેલ તારીખ",
+    "pdf.totalIncome": "કુલ આવક",
+    "pdf.totalExpense": "કુલ ખર્ચ",
+    "pdf.netBalance": "ચોખ્ખું બેલેન્સ",
+    "pdf.date": "તારીખ",
+    "pdf.type": "પ્રકાર",
+    "pdf.category": "શ્રેણી",
+    "pdf.desc": "વર્ણન",
+    "pdf.amount": "રકમ",
+    "pdf.by": "દ્વારા",
+    "pdf.pending": "બાકી",
+    
+    // Initialization
+    "init.success": "ડેટાબેઝ સફળતાપૂર્વક શરૂ થયો! હવે તમે લોગિન કરી શકો છો.",
+    "init.fail": "શરૂઆતમાં નિષ્ફળતા:",
     
     // Delete Modal
     "del.title": "વ્યવહાર કાઢી નાખવો છે?",
@@ -157,7 +218,10 @@ const translations = {
     "chart.overview": "નાણાકીય વિહંગાવલોકન",
     "chart.pie": "શ્રેણી દૃશ્ય",
     "chart.line": "વલણ દૃશ્ય",
-    "chart.noData": "આ સમયગાળા માટે કોઈ ડેટા ઉપલબ્ધ નથી."
+    "chart.noData": "આ સમયગાળા માટે કોઈ ડેટા ઉપલબ્ધ નથી.",
+    
+    // PWA
+    "pwa.install": "એપ ઇન્સ્ટોલ કરો"
   }
 };
 

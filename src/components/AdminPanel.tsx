@@ -137,7 +137,7 @@ export function AdminPanel() {
   };
 
   const deleteFlat = async (id: string) => {
-    if (window.confirm(`Are you sure you want to delete flat ${id}?`)) {
+    if (window.confirm(t('admin.deleteConfirm').replace('{id}', id))) {
       try {
         await deleteDoc(doc(db, 'flats', id));
       } catch (err) {
@@ -150,9 +150,14 @@ export function AdminPanel() {
     e.preventDefault();
     setAddError("");
     const formData = new FormData(e.currentTarget);
-    const flatNo = (formData.get('flatNo') as string).toUpperCase();
+    const flatNo = (formData.get('flatNo') as string).trim().toUpperCase();
     const role = formData.get('role') as 'admin' | 'resident';
     const password = formData.get('password') as string;
+
+    if (!flatNo || !password) {
+      setAddError(t('admin.errorRequired'));
+      return;
+    }
 
     try {
       if (!user) {
@@ -221,8 +226,8 @@ export function AdminPanel() {
       <header className="bg-white border-b border-black/5 sticky top-0 z-40">
         <div className="max-w-5xl mx-auto px-4 h-20 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-[#5A5A40] rounded-xl flex items-center justify-center">
-              <Shield className="text-white w-6 h-6" />
+            <div className="w-10 h-10 bg-[#5A5A40] rounded-xl flex items-center justify-center overflow-hidden">
+              <img src="https://raw.githubusercontent.com/acegikmo135/assets/main/vbub4efh.jpg" alt="Logo" className="w-full h-full object-cover" />
             </div>
             <div>
               <h1 className="text-xl font-serif">{t('admin.title')}</h1>
@@ -360,7 +365,7 @@ export function AdminPanel() {
                     name="flatNo"
                     type="text"
                     required
-                    placeholder="e.g. F601"
+                    placeholder={t('admin.flatNoPlaceholder')}
                     className="w-full px-6 py-4 bg-[#F5F5F0] border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40]/20 outline-none"
                   />
                 </div>
@@ -371,7 +376,7 @@ export function AdminPanel() {
                     name="password"
                     type="text"
                     required
-                    placeholder="Set access password"
+                    placeholder={t('admin.passwordPlaceholder')}
                     className="w-full px-6 py-4 bg-[#F5F5F0] border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40]/20 outline-none"
                   />
                 </div>

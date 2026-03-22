@@ -60,6 +60,7 @@ import {
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, startOfYear, endOfYear, eachMonthOfInterval, isSameMonth } from 'date-fns';
 import { BrowserRouter, Routes, Route, Link, useNavigate } from 'react-router-dom';
 import { AdminPanel } from './components/AdminPanel';
+import { InstallPWA } from './components/InstallPWA';
 import { LanguageProvider, useLanguage } from './contexts/LanguageContext';
 import { motion, AnimatePresence } from 'motion/react';
 import jsPDF from 'jspdf';
@@ -235,11 +236,15 @@ function Dashboard() {
       if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-login-credentials') {
         try {
           const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-          await setDoc(doc(db, 'flats', flatNo.toLowerCase()), {
-            flatNo: userData.flatNo,
-            role: userData.role,
-            password: userData.password
-          });
+          const docRef = doc(db, 'flats', flatNo.toLowerCase());
+          const docSnap = await getDoc(docRef);
+          if (!docSnap.exists()) {
+            await setDoc(docRef, {
+              flatNo: userData.flatNo,
+              role: userData.role,
+              password: userData.password
+            });
+          }
           setUser(userCredential.user);
         } catch (bootstrapErr: any) {
           console.error("Bootstrap error:", bootstrapErr);
@@ -291,10 +296,10 @@ function Dashboard() {
           }
         }
       }
-      alert("Database initialized successfully! You can now login.");
+      alert(t('init.success'));
     } catch (err: any) {
       console.error("Init error:", err);
-      alert("Initialization failed: " + (err.message || "Unknown error"));
+      alert(t('init.fail') + " " + (err.message || "Unknown error"));
     } finally {
       setLoading(false);
       signOut(auth);
@@ -316,7 +321,7 @@ function Dashboard() {
     const doc = new jsPDF();
     
     let filtered = transactions;
-    let title = "The Courtyard F wing - Fund Report";
+    let title = t('pdf.title');
     
     if (type === 'monthly') {
       const start = startOfMonth(new Date(year, month));
@@ -340,17 +345,17 @@ function Dashboard() {
     doc.text(title, 14, 22);
     doc.setFontSize(11);
     doc.setTextColor(100);
-    doc.text(`Generated on: ${format(new Date(), 'PPP p')}`, 14, 30);
+    doc.text(`${t('pdf.generatedOn')}: ${format(new Date(), 'PPP p')}`, 14, 30);
     
     const periodIncome = filtered.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0);
     const periodExpense = filtered.filter(t => t.type === 'expense').reduce((acc, t) => acc + t.amount, 0);
     
-    doc.text(`Total Income: Rs. ${periodIncome.toLocaleString()}`, 14, 38);
-    doc.text(`Total Expense: Rs. ${periodExpense.toLocaleString()}`, 14, 44);
-    doc.text(`Net Balance: Rs. ${(periodIncome - periodExpense).toLocaleString()}`, 14, 50);
+    doc.text(`${t('pdf.totalIncome')}: Rs. ${periodIncome.toLocaleString()}`, 14, 38);
+    doc.text(`${t('pdf.totalExpense')}: Rs. ${periodExpense.toLocaleString()}`, 14, 44);
+    doc.text(`${t('pdf.netBalance')}: Rs. ${(periodIncome - periodExpense).toLocaleString()}`, 14, 50);
 
     const tableData = filtered.map(t => [
-      t.date ? format(t.date.toDate(), 'MMM d, yyyy') : 'Pending',
+      t.date ? format(t.date.toDate(), 'MMM d, yyyy') : t('pdf.pending'),
       t.type.toUpperCase(),
       t.category,
       t.description || '-',
@@ -360,7 +365,7 @@ function Dashboard() {
 
     autoTable(doc, {
       startY: 55,
-      head: [['Date', 'Type', 'Category', 'Description', 'Amount', 'By']],
+      head: [[t('pdf.date'), t('pdf.type'), t('pdf.category'), t('pdf.desc'), t('pdf.amount'), t('pdf.by')]],
       body: tableData,
       theme: 'striped',
       headStyles: { fillColor: [90, 90, 64] },
@@ -488,8 +493,8 @@ function Dashboard() {
           className="w-full max-w-md bg-white rounded-[32px] p-8 shadow-sm border border-black/5"
         >
           <div className="flex flex-col items-center mb-8">
-            <div className="w-16 h-16 bg-[#5A5A40] rounded-full flex items-center justify-center mb-4">
-              <Building2 className="text-white w-8 h-8" />
+            <div className="w-16 h-16 bg-[#5A5A40] rounded-full flex items-center justify-center mb-4 overflow-hidden">
+              <img src="https://raw.githubusercontent.com/acegikmo135/assets/main/vbub4efh.jpg" alt="Logo" className="w-full h-full object-cover" />
             </div>
             <h1 className="text-3xl font-serif text-[#1A1A1A]">{t('app.title')}</h1>
             <p className="text-[#5A5A40]/60 font-serif italic text-center">{t('app.subtitle')}</p>
@@ -503,7 +508,7 @@ function Dashboard() {
                 <input 
                   name="flatNo"
                   required
-                  placeholder="e.g. F601"
+                  placeholder={t('login.flatNoPlaceholder')}
                   className="w-full pl-12 pr-4 py-3 bg-[#F5F5F0] border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40]/20 outline-none transition-all"
                 />
               </div>
@@ -517,7 +522,7 @@ function Dashboard() {
                   name="password"
                   type="password"
                   required
-                  placeholder="••••••••"
+                  placeholder={t('login.passwordPlaceholder')}
                   className="w-full pl-12 pr-4 py-3 bg-[#F5F5F0] border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40]/20 outline-none transition-all"
                 />
               </div>
@@ -560,8 +565,8 @@ function Dashboard() {
       <header className="bg-white border-b border-black/5 sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-4 h-20 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-[#5A5A40] rounded-xl flex items-center justify-center">
-              <Building2 className="text-white w-5 h-5" />
+            <div className="w-10 h-10 bg-[#5A5A40] rounded-xl flex items-center justify-center overflow-hidden">
+              <img src="https://raw.githubusercontent.com/acegikmo135/assets/main/vbub4efh.jpg" alt="Logo" className="w-full h-full object-cover" />
             </div>
             <div>
               <h2 className="font-serif text-lg leading-tight">{t('app.title')}</h2>
@@ -614,7 +619,7 @@ function Dashboard() {
                 transition={{ type: "spring", stiffness: 300, damping: 20 }}
                 className="bg-white p-6 rounded-[32px] shadow-sm border border-black/5 cursor-default"
               >
-                <p className="text-xs uppercase tracking-widest text-[#5A5A40]/60 mb-2 font-medium">Current Balance</p>
+                <p className="text-xs uppercase tracking-widest text-[#5A5A40]/60 mb-2 font-medium">{t('dash.totalBalance')}</p>
                 <h3 className="text-4xl font-serif">₹{balance.toLocaleString()}</h3>
               </motion.div>
 
@@ -627,7 +632,7 @@ function Dashboard() {
               >
                 <div className="flex items-center gap-2 text-emerald-600 mb-2">
                   <TrendingUp className="w-4 h-4" />
-                  <p className="text-xs uppercase tracking-widest font-medium">Total Income</p>
+                  <p className="text-xs uppercase tracking-widest font-medium">{t('income')}</p>
                 </div>
                 <h3 className="text-3xl font-serif">₹{totalIncome.toLocaleString()}</h3>
               </motion.div>
@@ -641,7 +646,7 @@ function Dashboard() {
               >
                 <div className="flex items-center gap-2 text-rose-600 mb-2">
                   <TrendingDown className="w-4 h-4" />
-                  <p className="text-xs uppercase tracking-widest font-medium">Total Expenses</p>
+                  <p className="text-xs uppercase tracking-widest font-medium">{t('expense')}</p>
                 </div>
                 <h3 className="text-3xl font-serif">₹{totalExpense.toLocaleString()}</h3>
               </motion.div>
@@ -654,14 +659,14 @@ function Dashboard() {
           {/* Transaction List */}
           <div className="lg:col-span-2 space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <h3 className="text-xl font-serif">Recent Transactions</h3>
+              <h3 className="text-xl font-serif">{t('dash.recent')}</h3>
               <div className="flex items-center gap-2">
                 <button 
                   onClick={() => setIsExportModalOpen(true)}
                   className="flex items-center gap-2 bg-white border border-black/5 text-[#5A5A40] px-4 py-2 rounded-full text-sm font-medium hover:bg-[#F5F5F0] transition-colors"
                 >
                   <Download className="w-4 h-4" />
-                  PDF
+                  {t('dash.export')}
                 </button>
                 {flatInfo?.role === 'admin' && (
                   <button 
@@ -669,7 +674,7 @@ function Dashboard() {
                     className="flex items-center gap-2 bg-[#5A5A40] text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-[#4A4A30] transition-colors"
                   >
                     <PlusCircle className="w-4 h-4" />
-                    Add Entry
+                    {t('dash.add')}
                   </button>
                 )}
               </div>
@@ -681,7 +686,7 @@ function Dashboard() {
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#5A5A40]/40" />
                 <input 
                   type="text"
-                  placeholder="Search by category or description..."
+                  placeholder={t('dash.search')}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-12 pr-4 py-3 bg-white border border-black/5 rounded-2xl focus:ring-2 focus:ring-[#5A5A40]/20 outline-none transition-all text-sm"
@@ -697,7 +702,7 @@ function Dashboard() {
                       filterType === type ? "bg-[#5A5A40] text-white shadow-sm" : "text-[#5A5A40]/40 hover:text-[#5A5A40]"
                     )}
                   >
-                    {type}
+                    {t(type)}
                   </button>
                 ))}
               </div>
@@ -725,7 +730,7 @@ function Dashboard() {
                     exit={{ opacity: 0 }}
                     className="text-center py-20 bg-white rounded-[32px] border border-dashed border-[#5A5A40]/20"
                   >
-                    <p className="text-[#5A5A40]/40 font-serif italic">No transactions found.</p>
+                    <p className="text-[#5A5A40]/40 font-serif italic">{t('dash.noTransactions')}</p>
                   </motion.div>
                 ) : (
                   filteredTransactions.map((t) => (
@@ -906,11 +911,11 @@ function Dashboard() {
             </div>
 
             <div className="bg-[#5A5A40] p-6 rounded-[32px] text-white">
-              <h3 className="text-lg font-serif mb-2">Financial Health</h3>
+              <h3 className="text-lg font-serif mb-2">{t('dash.health')}</h3>
               <p className="text-sm text-white/70 leading-relaxed">
                 {balance > 0 
-                  ? "The building fund is healthy. We have a positive surplus for future maintenance."
-                  : "The building fund is currently in deficit. Please ensure all dues are cleared."}
+                  ? t('dash.healthGood')
+                  : t('dash.healthBad')}
               </p>
             </div>
           </div>
@@ -934,7 +939,7 @@ function Dashboard() {
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
               className="relative w-full max-w-lg bg-white rounded-[32px] p-8 shadow-2xl"
             >
-              <h3 className="text-2xl font-serif mb-6">New Transaction</h3>
+              <h3 className="text-2xl font-serif mb-6">{t('tx.new')}</h3>
               <form 
                 onSubmit={async (e) => {
                   e.preventDefault();
@@ -953,7 +958,7 @@ function Dashboard() {
                     await addDoc(collection(db, 'transactions'), data);
                   } catch (err) {
                     console.error("Error adding transaction:", err);
-                    alert("Failed to add transaction. Check permissions.");
+                    alert(t('tx.error'));
                   }
                 }}
                 className="space-y-6"
@@ -963,21 +968,21 @@ function Dashboard() {
                     <input type="radio" name="type" value="income" defaultChecked className="peer sr-only" />
                     <div className="p-4 rounded-2xl bg-[#F5F5F0] border-2 border-transparent peer-checked:border-emerald-500 peer-checked:bg-emerald-50 transition-all text-center">
                       <TrendingUp className="w-6 h-6 mx-auto mb-2 text-emerald-600" />
-                      <span className="text-xs font-bold uppercase tracking-widest">Income</span>
+                      <span className="text-xs font-bold uppercase tracking-widest">{t('income')}</span>
                     </div>
                   </label>
                   <label className="relative cursor-pointer">
                     <input type="radio" name="type" value="expense" className="peer sr-only" />
                     <div className="p-4 rounded-2xl bg-[#F5F5F0] border-2 border-transparent peer-checked:border-rose-500 peer-checked:bg-rose-50 transition-all text-center">
                       <TrendingDown className="w-6 h-6 mx-auto mb-2 text-rose-600" />
-                      <span className="text-xs font-bold uppercase tracking-widest">Expense</span>
+                      <span className="text-xs font-bold uppercase tracking-widest">{t('expense')}</span>
                     </div>
                   </label>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs uppercase tracking-widest text-[#5A5A40] mb-2 font-medium">Amount (₹)</label>
+                    <label className="block text-xs uppercase tracking-widest text-[#5A5A40] mb-2 font-medium">{t('tx.amount')} (₹)</label>
                     <input 
                       name="amount"
                       type="number"
@@ -987,7 +992,7 @@ function Dashboard() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs uppercase tracking-widest text-[#5A5A40] mb-2 font-medium">Category</label>
+                    <label className="block text-xs uppercase tracking-widest text-[#5A5A40] mb-2 font-medium">{t('tx.category')}</label>
                     <select 
                       name="category"
                       required
@@ -999,11 +1004,11 @@ function Dashboard() {
                 </div>
 
                 <div>
-                  <label className="block text-xs uppercase tracking-widest text-[#5A5A40] mb-2 font-medium">Description</label>
+                  <label className="block text-xs uppercase tracking-widest text-[#5A5A40] mb-2 font-medium">{t('tx.description')}</label>
                   <textarea 
                     name="description"
                     rows={3}
-                    placeholder="Brief details..."
+                    placeholder={t('tx.descPlaceholder')}
                     className="w-full px-4 py-3 bg-[#F5F5F0] border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40]/20 outline-none resize-none"
                   />
                 </div>
@@ -1014,13 +1019,13 @@ function Dashboard() {
                     onClick={() => setIsAdding(false)}
                     className="flex-1 py-4 rounded-full font-medium text-[#5A5A40] bg-[#F5F5F0] hover:bg-black/5 transition-colors"
                   >
-                    Cancel
+                    {t('cancel')}
                   </button>
                   <button 
                     type="submit"
                     className="flex-1 bg-[#5A5A40] text-white py-4 rounded-full font-medium hover:bg-[#4A4A30] transition-colors"
                   >
-                    Save Entry
+                    {t('tx.save')}
                   </button>
                 </div>
               </form>
@@ -1171,6 +1176,7 @@ export default function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/adminpanel" element={<AdminPanel />} />
         </Routes>
+        <InstallPWA />
       </BrowserRouter>
     </LanguageProvider>
   );
