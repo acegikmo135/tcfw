@@ -31,7 +31,6 @@ service cloud.firestore {
     function isAdmin() {
       return isAuthenticated() && 
         (request.auth.token.email == "manthankansagra@gmail.com" || 
-         request.auth.token.email == "admin@building.local" ||
          (exists(/databases/$(database)/documents/flats/$(request.auth.token.email.split('@')[0])) && 
           get(/databases/$(database)/documents/flats/$(request.auth.token.email.split('@')[0])).data.role == 'admin'));
     }
@@ -48,8 +47,13 @@ service cloud.firestore {
 
     match /flats/{flatId} {
       allow read: if isAuthenticated();
-      // Allow admins to manage all flats, and allow initial setup for specific emails
-      allow create: if isAdmin() || (isAuthenticated() && (request.auth.token.email == flatId + "@building.local" || request.auth.token.email == "manthankansagra@gmail.com"));
+      // Allow admins to manage all flats
+      // Allow initial setup for specific emails, but restrict role creation
+      allow create: if isAdmin() || 
+        (isAuthenticated() && 
+         (request.auth.token.email == flatId + "@building.local" || request.auth.token.email == "manthankansagra@gmail.com") &&
+         (request.resource.data.role == 'resident' || request.auth.token.email == 'f602@building.local' || request.auth.token.email == 'manthankansagra@gmail.com')
+        );
       allow update, delete: if isAdmin();
     }
 

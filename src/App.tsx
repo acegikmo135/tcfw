@@ -200,30 +200,6 @@ function Dashboard() {
     const flatNo = (formData.get('flatNo') as string).trim();
     const password = (formData.get('password') as string).trim();
     
-    // Validate if it's one of our predefined users or in Firestore
-    let userData: any = PREDEFINED_USERS.find(u => u.flatNo.toUpperCase() === flatNo.toUpperCase() && u.password === password);
-    
-    if (!userData) {
-      // Check Firestore for the user
-      try {
-        const docRef = doc(db, 'flats', flatNo.toLowerCase());
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          if (data.password === password) {
-            userData = data;
-          }
-        }
-      } catch (err) {
-        console.error("Firestore login check error:", err);
-      }
-    }
-    
-    if (!userData) {
-      setAuthError("Invalid Flat Number or Password.");
-      return;
-    }
-
     const email = `${flatNo.toLowerCase()}@building.local`;
 
     try {
@@ -232,77 +208,34 @@ function Dashboard() {
     } catch (err: any) {
       console.error("Login error:", err.code, err.message);
       
-      // If user doesn't exist, try to create them (Auto-bootstrap)
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-login-credentials') {
+      // Auto-bootstrap predefined users
+      const predefined = PREDEFINED_USERS.find(u => u.flatNo.toUpperCase() === flatNo.toUpperCase() && u.password === password);
+      
+      if (predefined && (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-login-credentials')) {
         try {
           const userCredential = await createUserWithEmailAndPassword(auth, email, password);
           const docRef = doc(db, 'flats', flatNo.toLowerCase());
           const docSnap = await getDoc(docRef);
           if (!docSnap.exists()) {
             await setDoc(docRef, {
-              flatNo: userData.flatNo,
-              role: userData.role,
-              password: userData.password
+              flatNo: predefined.flatNo,
+              role: predefined.role
             });
           }
           setUser(userCredential.user);
+          return;
         } catch (bootstrapErr: any) {
           console.error("Bootstrap error:", bootstrapErr);
-          if (bootstrapErr.code === 'auth/email-already-in-use') {
-            // This means the user exists in Auth but maybe password was wrong or something else
-            setAuthError("Invalid Password.");
-          } else {
-            setAuthError("Failed to initialize user. Please check your connection.");
-          }
+          setAuthError("Failed to initialize predefined user.");
+          return;
         }
-      } else if (err.code === 'auth/operation-not-allowed') {
-        setAuthError("Email/Password login is not enabled in Firebase Console. Please enable it in Authentication > Sign-in method.");
-      } else {
-        setAuthError(`Login failed: ${err.message}`);
       }
-    }
-  };
 
-  const initializeDatabase = async () => {
-    setLoading(true);
-    try {
-      for (const u of PREDEFINED_USERS) {
-        const email = `${u.flatNo.toLowerCase()}@building.local`;
-        try {
-          // Try to sign in first
-          await signInWithEmailAndPassword(auth, email, u.password);
-          // If successful, ensure Firestore doc exists
-          await setDoc(doc(db, 'flats', u.flatNo.toLowerCase()), {
-            flatNo: u.flatNo,
-            role: u.role
-          });
-        } catch (err: any) {
-          // If sign in fails because user doesn't exist, create them
-          if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-login-credentials') {
-            try {
-              await createUserWithEmailAndPassword(auth, email, u.password);
-              await setDoc(doc(db, 'flats', u.flatNo.toLowerCase()), {
-                flatNo: u.flatNo,
-                role: u.role
-              });
-            } catch (createErr: any) {
-              console.error(`Failed to create ${u.flatNo}:`, createErr);
-              // If email already exists, just try to update the doc (might happen if Auth exists but Firestore doesn't)
-              if (createErr.code === 'auth/email-already-in-use') {
-                 // We can't easily update Firestore without being logged in, 
-                 // but the loop will continue to the next user
-              }
-            }
-          }
-        }
+      if (err.code === 'auth/operation-not-allowed') {
+        setAuthError("Email/Password login is not enabled in Firebase Console.");
+      } else {
+        setAuthError("Invalid Flat Number or Password.");
       }
-      alert(t('init.success'));
-    } catch (err: any) {
-      console.error("Init error:", err);
-      alert(t('init.fail') + " " + (err.message || "Unknown error"));
-    } finally {
-      setLoading(false);
-      signOut(auth);
     }
   };
 
@@ -547,12 +480,28 @@ function Dashboard() {
             <p className="text-xs text-[#5A5A40]/40 uppercase tracking-tighter">
               {t('login.authorized')}
             </p>
-            <button 
-              onClick={initializeDatabase}
-              className="text-xs text-[#5A5A40]/60 hover:text-[#5A5A40] underline underline-offset-4"
-            >
-              {t('login.setup')}
-            </button>
+            <div className="pt-4 space-y-3">
+              <p className="text-sm font-serif text-[#5A5A40]">Made by Manthan - F602</p>
+              <div className="flex flex-col items-center gap-2">
+                <a 
+                  href="https://manthank.com" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-xs font-bold uppercase tracking-widest text-white bg-[#5A5A40] px-4 py-2 rounded-full hover:bg-[#4A4A30] transition-colors"
+                >
+                  Visit Website
+                </a>
+                <p className="text-xs text-[#5A5A40]/60 mt-2">If any issue, contact dev@manthank.com</p>
+                <a 
+                  href="https://mail.google.com/mail/?view=cm&fs=1&to=dev@manthank.com" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-xs font-bold uppercase tracking-widest text-[#5A5A40] border border-[#5A5A40]/20 px-4 py-2 rounded-full hover:bg-[#F5F5F0] transition-colors"
+                >
+                  Email Support
+                </a>
+              </div>
+            </div>
           </div>
         </motion.div>
       </div>
@@ -921,6 +870,31 @@ function Dashboard() {
           </div>
         </div>
       </main>
+
+      <footer className="max-w-5xl mx-auto px-4 py-8 border-t border-black/5 mt-8 text-center">
+        <p className="text-sm font-serif text-[#5A5A40] mb-4">Made by Manthan - F602</p>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+          <a 
+            href="https://manthank.com" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-xs font-bold uppercase tracking-widest text-white bg-[#5A5A40] px-6 py-3 rounded-full hover:bg-[#4A4A30] transition-colors shadow-sm"
+          >
+            Visit Website
+          </a>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-[#5A5A40]/60">If any issue, contact dev@manthank.com</span>
+            <a 
+              href="https://mail.google.com/mail/?view=cm&fs=1&to=dev@manthank.com" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-xs font-bold uppercase tracking-widest text-[#5A5A40] border border-[#5A5A40]/20 px-6 py-3 rounded-full hover:bg-[#F5F5F0] transition-colors"
+            >
+              Email Support
+            </a>
+          </div>
+        </div>
+      </footer>
 
       {/* Add Transaction Modal */}
       <AnimatePresence>

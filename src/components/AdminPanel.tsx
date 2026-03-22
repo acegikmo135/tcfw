@@ -45,11 +45,8 @@ interface Flat {
   password?: string;
 }
 
-const ADMIN_PASSWORD = "admin123"; // Updated password
-
 export function AdminPanel() {
   const [isAuthorized, setIsAuthorized] = useState(false);
-  const [passwordInput, setPasswordInput] = useState("");
   const [error, setError] = useState("");
   const [user, setUser] = useState<User | null>(null);
   const [flats, setFlats] = useState<Flat[]>([]);
@@ -95,38 +92,6 @@ export function AdminPanel() {
     return () => unsubscribe();
   }, [isAuthorized]);
 
-  const handleAuthorize = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (passwordInput === ADMIN_PASSWORD) {
-      try {
-        await signInWithEmailAndPassword(auth, 'admin@building.local', ADMIN_PASSWORD);
-        setIsAuthorized(true);
-        setError("");
-      } catch (err: any) {
-        if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-login-credentials') {
-          try {
-            await createUserWithEmailAndPassword(auth, 'admin@building.local', ADMIN_PASSWORD);
-            await setDoc(doc(db, 'flats', 'admin'), {
-              flatNo: 'ADMIN',
-              role: 'admin',
-              password: ADMIN_PASSWORD
-            });
-            setIsAuthorized(true);
-            setError("");
-          } catch (createErr) {
-            console.error("Error creating admin user:", createErr);
-            setError(t('admin.errorAuth'));
-          }
-        } else {
-          console.error("Error signing in admin:", err);
-          setError(t('admin.errorAuth'));
-        }
-      }
-    } else {
-      setError(t('admin.errorAuth'));
-    }
-  };
-
   const toggleRole = async (flat: Flat) => {
     const newRole = flat.role === 'admin' ? 'resident' : 'admin';
     try {
@@ -159,19 +124,47 @@ export function AdminPanel() {
       return;
     }
 
+    if (password.length < 6) {
+      setAddError("Password must be at least 6 characters.");
+      return;
+    }
+
     try {
       if (!user) {
         throw new Error("Not authenticated");
       }
+
+      // Create user in Firebase Auth using a secondary app
+      const { initializeApp } = await import('firebase/app');
+      const { getAuth, createUserWithEmailAndPassword, signOut: signOutSecondary } = await import('firebase/auth');
+      const firebaseConfig = (await import('../../firebase-applet-config.json')).default;
+      
+      const secondaryApp = initializeApp(firebaseConfig, "SecondaryApp" + Date.now());
+      const secondaryAuth = getAuth(secondaryApp);
+      
+      const email = `${flatNo.toLowerCase()}@building.local`;
+      
+      try {
+        await createUserWithEmailAndPassword(secondaryAuth, email, password);
+        await signOutSecondary(secondaryAuth);
+      } catch (authErr: any) {
+        if (authErr.code === 'auth/email-already-in-use') {
+          // User already exists in Auth, we can just update their role in Firestore
+          console.log("User already exists in Auth, updating Firestore only.");
+          alert(`Note: The user ${flatNo} already exists in the authentication system. Their password was NOT changed. If they forgot their password, they cannot be reset from this panel without a real email address.`);
+        } else {
+          throw authErr;
+        }
+      }
+
       await setDoc(doc(db, 'flats', flatNo.toLowerCase()), {
         flatNo,
-        role,
-        password
+        role
       });
       setIsAdding(false);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error adding flat:", err);
-      setAddError(t('admin.errorAdd'));
+      setAddError(err.message || t('admin.errorAdd'));
     }
   };
 
@@ -181,38 +174,18 @@ export function AdminPanel() {
         <motion.div 
           initial={{ opacity: 0, scale: 0.9, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          className="w-full max-w-md bg-white p-8 rounded-[32px] shadow-xl border border-black/5"
+          className="w-full max-w-md bg-white p-8 rounded-[32px] shadow-xl border border-black/5 text-center"
         >
           <div className="w-16 h-16 bg-[#5A5A40]/10 rounded-full flex items-center justify-center mx-auto mb-6">
-            <Lock className="text-[#5A5A40] w-8 h-8" />
+            <Shield className="text-[#5A5A40] w-8 h-8" />
           </div>
-          <h2 className="text-3xl font-serif text-center mb-2">{t('admin.access')}</h2>
-          <p className="text-center text-[#5A5A40]/60 mb-8 text-sm">{t('admin.subtitle')}</p>
-          
-          <form onSubmit={handleAuthorize} className="space-y-6">
-            <div>
-              <input 
-                type="password"
-                placeholder={t('admin.masterPass')}
-                value={passwordInput}
-                onChange={(e) => setPasswordInput(e.target.value)}
-                className="w-full px-6 py-4 bg-[#F5F5F0] border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40]/20 outline-none text-center text-lg tracking-widest"
-                autoFocus
-              />
-              {error && <p className="text-rose-500 text-xs mt-2 text-center font-medium">{error}</p>}
-            </div>
-            <button 
-              type="submit"
-              className="w-full bg-[#5A5A40] text-white py-4 rounded-full font-bold uppercase tracking-widest hover:bg-[#4A4A30] transition-all shadow-lg shadow-[#5A5A40]/20"
-            >
-              {t('admin.authorize')}
-            </button>
-          </form>
+          <h2 className="text-3xl font-serif text-center mb-2">{t('admin.accessDenied') || 'Access Denied'}</h2>
+          <p className="text-center text-[#5A5A40]/60 mb-8 text-sm">You must be logged in as an administrator to view this page.</p>
           
           <div className="mt-8 text-center">
-            <Link to="/" className="text-[#5A5A40]/40 hover:text-[#5A5A40] text-xs font-medium flex items-center justify-center gap-2 transition-colors">
-              <ArrowLeft className="w-3 h-3" />
-              {t('admin.back')}
+            <Link to="/" className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-[#5A5A40] text-white rounded-full font-bold uppercase tracking-widest text-xs hover:bg-[#4A4A30] transition-colors">
+              <ArrowLeft className="w-4 h-4" />
+              {t('dash.back') || 'Back'}
             </Link>
           </div>
         </motion.div>
@@ -309,11 +282,6 @@ export function AdminPanel() {
                   </div>
 
                   <div className="space-y-4">
-                    <div className="bg-[#F5F5F0] p-4 rounded-2xl">
-                      <p className="text-[10px] uppercase tracking-widest text-[#5A5A40]/40 font-bold mb-1">{t('admin.accessPass')}</p>
-                      <p className="font-mono text-sm tracking-widest">{flat.password || '••••••••'}</p>
-                    </div>
-
                     <button 
                       onClick={() => toggleRole(flat)}
                       className={cn(
@@ -332,6 +300,31 @@ export function AdminPanel() {
           </div>
         )}
       </main>
+
+      <footer className="max-w-5xl mx-auto px-4 py-8 border-t border-black/5 mt-8 text-center">
+        <p className="text-sm font-serif text-[#5A5A40] mb-4">Made by Manthan - F602</p>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+          <a 
+            href="https://manthank.com" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-xs font-bold uppercase tracking-widest text-white bg-[#5A5A40] px-6 py-3 rounded-full hover:bg-[#4A4A30] transition-colors shadow-sm"
+          >
+            Visit Website
+          </a>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-[#5A5A40]/60">If any issue, contact dev@manthank.com</span>
+            <a 
+              href="https://mail.google.com/mail/?view=cm&fs=1&to=dev@manthank.com" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-xs font-bold uppercase tracking-widest text-[#5A5A40] border border-[#5A5A40]/20 px-6 py-3 rounded-full hover:bg-[#F5F5F0] transition-colors"
+            >
+              Email Support
+            </a>
+          </div>
+        </div>
+      </footer>
 
       {/* Add Flat Modal */}
       <AnimatePresence>
