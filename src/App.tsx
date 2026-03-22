@@ -58,6 +58,8 @@ import {
   Bar
 } from 'recharts';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, startOfYear, endOfYear, eachMonthOfInterval, isSameMonth } from 'date-fns';
+import { BrowserRouter, Routes, Route, Link, useNavigate } from 'react-router-dom';
+import { AdminPanel } from './components/AdminPanel';
 import { motion, AnimatePresence } from 'motion/react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -101,7 +103,7 @@ const PREDEFINED_USERS = [
 
 // --- Components ---
 
-export default function App() {
+function Dashboard() {
   const [user, setUser] = useState<User | null>(null);
   const [flatInfo, setFlatInfo] = useState<FlatInfo | null>(null);
   const [loading, setLoading] = useState(true);
@@ -121,6 +123,8 @@ export default function App() {
   const [timeRange, setTimeRange] = useState<'monthly' | 'yearly'>('monthly');
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+
+  const navigate = useNavigate();
 
   const years = useMemo(() => {
     const uniqueYears = new Set<number>();
@@ -566,13 +570,13 @@ export default function App() {
           </div>
           <div className="flex items-center gap-4">
             {flatInfo?.role === 'admin' && (
-              <a 
-                href="/adminpanel.html" 
+              <Link 
+                to="/adminpanel" 
                 className="hidden sm:flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[#5A5A40]/40 hover:text-[#5A5A40] transition-colors"
               >
                 <Shield className="w-4 h-4" />
                 Admin Panel
-              </a>
+              </Link>
             )}
             <button 
               onClick={handleLogout}
@@ -1148,5 +1152,16 @@ export default function App() {
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/adminpanel" element={<AdminPanel />} />
+      </Routes>
+    </BrowserRouter>
   );
 }

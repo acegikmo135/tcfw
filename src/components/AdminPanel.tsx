@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { createRoot } from 'react-dom/client';
 import { 
   collection, 
   onSnapshot, 
@@ -9,7 +8,7 @@ import {
   query,
   orderBy
 } from 'firebase/firestore';
-import { db, auth } from './firebase';
+import { db, auth } from '../firebase';
 import { 
   onAuthStateChanged, 
   signOut,
@@ -20,18 +19,14 @@ import {
   Plus, 
   Trash2, 
   Shield, 
-  ShieldAlert, 
   LogOut, 
   Lock,
   ArrowLeft,
-  Loader2,
-  CheckCircle2,
-  XCircle
+  Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import './index.css';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -41,12 +36,12 @@ interface Flat {
   id: string;
   flatNo: string;
   role: 'admin' | 'resident';
-  password?: string; // For display/edit in admin panel
+  password?: string;
 }
 
-const ADMIN_PASSWORD = "admin_courtyard_f"; // The password for the route
+const ADMIN_PASSWORD = "admin123"; // Updated password
 
-function AdminPanel() {
+export function AdminPanel() {
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [passwordInput, setPasswordInput] = useState("");
   const [error, setError] = useState("");
@@ -58,11 +53,6 @@ function AdminPanel() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
       setUser(u);
-      if (!u) {
-        // Redirect to main app if not logged in at all? 
-        // Actually, the admin panel should be accessible if they know the password, 
-        // but they still need to be an admin in Firebase to perform actions.
-      }
     });
     return () => unsubscribe();
   }, []);
@@ -101,7 +91,7 @@ function AdminPanel() {
   };
 
   const deleteFlat = async (id: string) => {
-    if (confirm(`Are you sure you want to delete flat ${id}?`)) {
+    if (window.confirm(`Are you sure you want to delete flat ${id}?`)) {
       try {
         await deleteDoc(doc(db, 'flats', id));
       } catch (err) {
@@ -118,10 +108,10 @@ function AdminPanel() {
     const password = formData.get('password') as string;
 
     try {
-      await setDoc(doc(db, 'flats', flatNo), {
+      await setDoc(doc(db, 'flats', flatNo.toLowerCase()), {
         flatNo,
         role,
-        password // Storing password in doc for management
+        password
       });
       setIsAdding(false);
     } catch (err) {
@@ -133,8 +123,8 @@ function AdminPanel() {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-[#F5F5F0]">
         <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 0, scale: 0.9, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
           className="w-full max-w-md bg-white p-8 rounded-[32px] shadow-xl border border-black/5"
         >
           <div className="w-16 h-16 bg-[#5A5A40]/10 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -362,10 +352,4 @@ function AdminPanel() {
       </AnimatePresence>
     </div>
   );
-}
-
-const container = document.getElementById('root');
-if (container) {
-  const root = createRoot(container);
-  root.render(<AdminPanel />);
 }
