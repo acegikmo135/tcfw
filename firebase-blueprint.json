@@ -1,0 +1,39 @@
+{
+  "entities": {
+    "Flat": {
+      "title": "Flat",
+      "description": "A building unit with login credentials and role.",
+      "type": "object",
+      "properties": {
+        "flatNo": { "type": "string", "description": "The flat number (e.g., F601)." },
+        "password": { "type": "string", "description": "The password for login." },
+        "role": { "type": "string", "enum": ["admin", "resident"], "description": "The role of the flat." }
+      },
+      "required": ["flatNo", "password", "role"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "An income or expense entry for the building fund.",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["income", "expense"], "description": "Type of transaction." },
+        "amount": { "type": "number", "description": "Amount in currency." },
+        "category": { "type": "string", "description": "Category (e.g., Plumbing, Wiring)." },
+        "description": { "type": "string", "description": "Detailed description." },
+        "date": { "type": "string", "format": "date-time", "description": "When the transaction occurred." },
+        "createdBy": { "type": "string", "description": "The flat ID that created this entry." }
+      },
+      "required": ["type", "amount", "category", "date", "createdBy"]
+    }
+  },
+  "firestore": {
+    "/flats/{flatId}": {
+      "schema": "Flat",
+      "description": "Collection of building flats and their credentials."
+    },
+    "/transactions/{transactionId}": {
+      "schema": "Transaction",
+      "description": "Collection of all financial transactions."
+    }
+  }
+}

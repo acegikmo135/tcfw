@@ -1,0 +1,64 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: flats
+    // Document ID: {flatId} (e.g., F601)
+    // Fields:
+    //   - flatNo: string (required)
+    //   - role: string (required, 'admin' or 'resident')
+    //
+    // Collection: transactions
+    // Document ID: {transactionId}
+    // Fields:
+    //   - type: string (required, 'income' or 'expense')
+    //   - amount: number (required, positive)
+    //   - category: string (required)
+    //   - description: string (optional)
+    //   - date: timestamp (required)
+    //   - createdBy: string (required, flatId)
+    //
+    // ===============================================================
+
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (request.auth.token.email == "manthankansagra@gmail.com" || 
+         (exists(/databases/$(database)/documents/flats/$(request.auth.token.email.split('@')[0])) && 
+          get(/databases/$(database)/documents/flats/$(request.auth.token.email.split('@')[0])).data.role == 'admin'));
+    }
+
+    // Validation Functions
+    function isValidTransaction(data) {
+      return data.keys().hasAll(['type', 'amount', 'category', 'date', 'createdBy']) &&
+             data.type in ['income', 'expense'] &&
+             data.amount is number && data.amount > 0 &&
+             data.category is string && data.category.size() > 0 &&
+             data.date is timestamp &&
+             data.createdBy is string;
+    }
+
+    match /flats/{flatId} {
+      allow read: if isAuthenticated();
+      // Allow admins to manage all flats, and allow initial setup for specific emails
+      allow create: if isAdmin() || (isAuthenticated() && (request.auth.token.email == flatId + "@building.local" || request.auth.token.email == "manthankansagra@gmail.com"));
+      allow update, delete: if isAdmin();
+    }
+
+    match /transactions/{transactionId} {
+      // All residents can read transactions
+      allow read: if isAuthenticated();
+      // Only admins can create/update/delete transactions
+      allow create: if isAdmin() && isValidTransaction(request.resource.data);
+      allow update: if isAdmin() && isValidTransaction(request.resource.data);
+      allow delete: if isAdmin();
+    }
+  }
+}
