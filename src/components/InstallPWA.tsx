@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Download } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
-import { useLocation } from 'react-router-dom';
 
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: string[];
@@ -16,7 +15,6 @@ export function InstallPWA() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstallable, setIsInstallable] = useState(false);
   const { t } = useLanguage();
-  const location = useLocation();
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: Event) => {
@@ -56,7 +54,7 @@ export function InstallPWA() {
     setIsInstallable(false);
   };
 
-  if (!isInstallable || location.pathname !== '/adminpanel') {
+  if (!isInstallable) {
     return null;
   }
 
