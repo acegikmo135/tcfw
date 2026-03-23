@@ -16,32 +16,12 @@ export default defineConfig(({mode}) => {
         devOptions: {
           enabled: true
         },
-        manifest: {
-          name: 'The Courtyard F Wing',
-          short_name: 'Courtyard F',
-          description: 'Transparent Fund Management',
-          theme_color: '#5A5A40',
-          background_color: '#F5F5F0',
-          display: 'standalone',
-          icons: [
-            {
-              src: 'https://raw.githubusercontent.com/acegikmo135/assets/main/vbub4efh.jpg',
-              sizes: '192x192',
-              type: 'image/jpeg',
-              purpose: 'any maskable'
-            },
-            {
-              src: 'https://raw.githubusercontent.com/acegikmo135/assets/main/vbub4efh.jpg',
-              sizes: '512x512',
-              type: 'image/jpeg',
-              purpose: 'any maskable'
-            }
-          ]
-        }
+        manifest: false
       })
     ],
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
+      'process.env.VITE_ONESIGNAL_APP_ID': JSON.stringify(env.VITE_ONESIGNAL_APP_ID),
     },
     resolve: {
       alias: {
@@ -49,10 +29,9 @@ export default defineConfig(({mode}) => {
       },
     },
     server: {
-      host: '0.0.0.0',
-      port: 5000,
-      allowedHosts: true,
-      hmr: true,
+      // HMR is disabled in AI Studio via DISABLE_HMR env var.
+      // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
+      hmr: process.env.DISABLE_HMR !== 'true',
     },
   };
 });

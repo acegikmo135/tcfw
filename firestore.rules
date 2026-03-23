@@ -45,6 +45,22 @@ service cloud.firestore {
              data.createdBy is string;
     }
 
+    function isValidComment(data) {
+      return data.keys().hasAll(['text', 'createdBy', 'createdAt', 'role']) &&
+             data.text is string && data.text.size() > 0 && data.text.size() <= 1000 &&
+             data.createdBy is string &&
+             data.createdAt is timestamp &&
+             data.role in ['admin', 'resident'];
+    }
+
+    function isValidNotice(data) {
+      return data.keys().hasAll(['title', 'content', 'createdBy', 'createdAt']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() <= 200 &&
+             data.content is string && data.content.size() > 0 && data.content.size() <= 5000 &&
+             data.createdBy is string &&
+             data.createdAt is timestamp;
+    }
+
     match /flats/{flatId} {
       allow read: if isAuthenticated();
       // Allow admins to manage all flats
@@ -54,7 +70,12 @@ service cloud.firestore {
          (request.auth.token.email == flatId + "@building.local" || request.auth.token.email == "manthankansagra@gmail.com") &&
          (request.resource.data.role == 'resident' || request.auth.token.email == 'f602@building.local' || request.auth.token.email == 'manthankansagra@gmail.com')
         );
-      allow update, delete: if isAdmin();
+      allow update: if isAdmin() || 
+        (isAuthenticated() && request.auth.token.email.split('@')[0] == flatId && 
+         (!('role' in request.resource.data) || request.resource.data.role == resource.data.role) &&
+         (!('flatNo' in request.resource.data) || request.resource.data.flatNo == resource.data.flatNo)
+        );
+      allow delete: if isAdmin();
     }
 
     match /transactions/{transactionId} {
@@ -64,28 +85,18 @@ service cloud.firestore {
       allow create: if isAdmin() && isValidTransaction(request.resource.data);
       allow update: if isAdmin() && isValidTransaction(request.resource.data);
       allow delete: if isAdmin();
+
+      match /comments/{commentId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated() && isValidComment(request.resource.data) && request.resource.data.createdBy == request.auth.token.email.split('@')[0];
+        allow update, delete: if isAdmin() || (isAuthenticated() && resource.data.createdBy == request.auth.token.email.split('@')[0]);
+      }
     }
 
     match /notices/{noticeId} {
-      // All authenticated users can read notices
       allow read: if isAuthenticated();
-      // Only admins can post, update (pin/unpin), or delete notices
-      allow create: if isAdmin() &&
-        request.resource.data.keys().hasAll(['title', 'content', 'createdBy', 'createdAt', 'isPinned']) &&
-        request.resource.data.title is string &&
-        request.resource.data.content is string;
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
-    }
-
-    match /categories/{categoryId} {
-      // All authenticated users can read categories
-      allow read: if isAuthenticated();
-      // Only admins can add or remove categories
-      allow create: if isAdmin() &&
-        request.resource.data.keys().hasAll(['name', 'iconName', 'order']) &&
-        request.resource.data.name is string;
-      allow update: if isAdmin();
+      allow create: if isAdmin() && isValidNotice(request.resource.data);
+      allow update: if isAdmin() && isValidNotice(request.resource.data);
       allow delete: if isAdmin();
     }
   }
