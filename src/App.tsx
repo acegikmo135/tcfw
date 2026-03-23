@@ -30,12 +30,16 @@ import {
   LayoutDashboard, 
   PlusCircle, 
   LogOut, 
-  TrendingUp, 
-  TrendingDown, 
-  Wrench, 
-  Zap, 
-  Shield, 
-  Trash2, 
+  Bell,
+  Pin,
+  Edit2,
+  X,
+  TrendingUp,
+  TrendingDown,
+  Wrench,
+  Zap,
+  Shield,
+  Trash2,
   Building2,
   Lock,
   User as UserIcon,
@@ -46,10 +50,7 @@ import {
   Filter,
   Eye,
   EyeOff,
-  Smartphone,
-  Bell,
-  Pin,
-  Edit2
+  Smartphone
 } from 'lucide-react';
 import OneSignal from 'react-onesignal';
 import { clsx, type ClassValue } from 'clsx';
@@ -139,6 +140,7 @@ function Dashboard() {
   const [isAdding, setIsAdding] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [selectedTransactionForComments, setSelectedTransactionForComments] = useState<Transaction | null>(null);
+  const [selectedTransactionForDetails, setSelectedTransactionForDetails] = useState<Transaction | null>(null);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loginFlatNo, setLoginFlatNo] = useState('');
@@ -152,7 +154,9 @@ function Dashboard() {
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [isAddingNotice, setIsAddingNotice] = useState(false);
   const [editingNotice, setEditingNotice] = useState<Notice | null>(null);
+  const [deletingNoticeId, setDeletingNoticeId] = useState<string | null>(null);
   const [noticeError, setNoticeError] = useState("");
+  const [isSubscribed, setIsSubscribed] = useState(false);
 
   // Chart State
   const [chartView, setChartView] = useState<'pie' | 'line'>('pie');
@@ -199,6 +203,16 @@ function Dashboard() {
           allowLocalhostAsSecureOrigin: true,
           serviceWorkerParam: { scope: '/' },
           serviceWorkerPath: 'OneSignalSDKWorker.js',
+        });
+        
+        // Check initial subscription status
+        const pushId = await OneSignal.User.PushSubscription.id;
+        const optedIn = OneSignal.User.PushSubscription.optedIn;
+        setIsSubscribed(!!pushId && optedIn);
+        
+        // Listen for changes
+        OneSignal.User.PushSubscription.addEventListener('change', (event) => {
+          setIsSubscribed(!!event.current.id && event.current.optedIn);
         });
       } catch (e) {
         console.error("OneSignal init error:", e);
@@ -359,12 +373,15 @@ function Dashboard() {
   };
 
   const deleteNotice = async (id: string) => {
-    if (window.confirm("Are you sure you want to delete this notice?")) {
-      try {
-        await deleteDoc(doc(db, 'notices', id));
-      } catch (error) {
-        handleFirestoreError(error, OperationType.DELETE, `notices/${id}`);
-      }
+    setDeletingNoticeId(id);
+  };
+
+  const confirmDeleteNotice = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'notices', id));
+      setDeletingNoticeId(null);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `notices/${id}`);
     }
   };
 
@@ -814,36 +831,6 @@ function Dashboard() {
           )}
         </div>
 
-        {notices.length > 0 && (
-          <div className="flex justify-center mb-8">
-            <div className="bg-white p-6 rounded-[32px] shadow-sm border border-[#5A5A40]/10 relative overflow-hidden w-full max-w-2xl">
-              <div className="absolute top-0 left-0 w-1 h-full bg-[#5A5A40]" />
-              <h3 className="text-xl font-serif mb-4 flex items-center gap-2">
-                <AlertCircle className="w-5 h-5 text-[#5A5A40]" />
-                Building Notices
-              </h3>
-              <div className="space-y-4">
-                {notices.map((notice) => (
-                  <div key={notice.id} className="p-4 bg-[#F5F5F0] rounded-2xl">
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <h4 className="font-medium text-[#1A1A1A]">{notice.title}</h4>
-                        <p className="text-[10px] uppercase tracking-widest font-bold text-[#5A5A40]/40 mt-1">
-                          By {notice.createdBy}
-                        </p>
-                      </div>
-                      <span className="text-[10px] uppercase tracking-widest font-bold text-[#5A5A40]/40">
-                        {notice.createdAt?.toDate ? notice.createdAt.toDate().toLocaleDateString() : 'Just now'}
-                      </span>
-                    </div>
-                    <p className="text-sm text-[#5A5A40]/80 whitespace-pre-wrap">{notice.content}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Actions & List */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Transaction List */}
@@ -966,11 +953,7 @@ function Dashboard() {
                         </div>
                       )}
                     </div>
-                    <p className="text-sm text-[#5A5A40]/80 mb-4 whitespace-pre-wrap leading-relaxed">{notice.content}</p>
-                    <div className="flex items-center justify-between text-[10px] uppercase tracking-widest font-bold text-[#5A5A40]/40">
-                      <span>By {notice.createdBy}</span>
-                      <span>{notice.createdAt?.toDate ? format(notice.createdAt.toDate(), 'MMM d, yyyy') : 'Just now'}</span>
-                    </div>
+                    <p className="text-sm text-[#5A5A40]/80 mb-2 whitespace-pre-wrap leading-relaxed">{notice.content}</p>
                   </motion.div>
                 ))}
                 {notices.length === 0 && (
@@ -1006,38 +989,39 @@ function Dashboard() {
                     <p className="text-[#5A5A40]/40 font-serif italic">{t('dash.noTransactions')}</p>
                   </motion.div>
                 ) : (
-                  filteredTransactions.map((t) => (
+                  filteredTransactions.map((transaction) => (
                     <motion.div 
-                      key={t.id}
+                      key={transaction.id}
                       layout
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0, x: 20 }}
                       whileHover={{ x: 5 }}
                       transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                      className="bg-white p-5 rounded-2xl shadow-sm border border-black/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group"
+                      onClick={() => setSelectedTransactionForDetails(transaction)}
+                      className="bg-white p-5 rounded-2xl shadow-sm border border-black/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group cursor-pointer"
                     >
                       <div className="flex items-center justify-between w-full sm:w-auto gap-4">
                         <div className="flex items-center gap-4">
                           <div className={cn(
                             "w-12 h-12 rounded-xl flex items-center justify-center shrink-0",
-                            t.type === 'income' ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
+                            transaction.type === 'income' ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
                           )}>
-                            {t.type === 'income' ? <TrendingUp className="w-6 h-6" /> : <TrendingDown className="w-6 h-6" />}
+                            {transaction.type === 'income' ? <TrendingUp className="w-6 h-6" /> : <TrendingDown className="w-6 h-6" />}
                           </div>
                           <div>
-                            <h4 className="font-medium text-[#1A1A1A]">{t.category}</h4>
+                            <h4 className="font-medium text-[#1A1A1A]">{transaction.category}</h4>
                             <p className="text-xs text-[#5A5A40]/60">
-                              {t.date ? format(t.date.toDate(), 'MMM d, yyyy • h:mm a') : 'Processing...'}
+                              {transaction.date ? format(transaction.date.toDate(), 'MMM d, yyyy • h:mm a') : 'Processing...'}
                             </p>
                           </div>
                         </div>
                         <div className="sm:hidden text-right">
                           <p className={cn(
                             "font-serif text-lg",
-                            t.type === 'income' ? "text-emerald-600" : "text-rose-600"
+                            transaction.type === 'income' ? "text-emerald-600" : "text-rose-600"
                           )}>
-                            {t.type === 'income' ? '+' : '-'} ₹{t.amount.toLocaleString()}
+                            {transaction.type === 'income' ? '+' : '-'} ₹{transaction.amount.toLocaleString()}
                           </p>
                         </div>
                       </div>
@@ -1045,33 +1029,39 @@ function Dashboard() {
                         <div className="hidden sm:block text-right">
                           <p className={cn(
                             "font-serif text-lg",
-                            t.type === 'income' ? "text-emerald-600" : "text-rose-600"
+                            transaction.type === 'income' ? "text-emerald-600" : "text-rose-600"
                           )}>
-                            {t.type === 'income' ? '+' : '-'} ₹{t.amount.toLocaleString()}
+                            {transaction.type === 'income' ? '+' : '-'} ₹{transaction.amount.toLocaleString()}
                           </p>
                           <p className="text-[10px] uppercase tracking-widest text-[#5A5A40]/40 font-medium">
-                            By {t.createdBy}
+                            By {transaction.createdBy}
                           </p>
                         </div>
                         <div className="sm:hidden">
                           <p className="text-[10px] uppercase tracking-widest text-[#5A5A40]/40 font-medium">
-                            By {t.createdBy}
+                            By {transaction.createdBy}
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
                           <button 
-                            onClick={() => setSelectedTransactionForComments(t)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedTransactionForComments(transaction);
+                            }}
                             className="relative p-2 text-[#5A5A40]/60 hover:text-[#5A5A40] hover:bg-[#F5F5F0] rounded-full transition-all"
                             title="View Comments"
                           >
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-message-circle"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>
-                            {t.commentCount && t.commentCount > 0 && (
+                            {transaction.commentCount && transaction.commentCount > 0 && (
                               <span className="absolute top-1 right-1 w-2 h-2 bg-rose-500 rounded-full border border-white" />
                             )}
                           </button>
                           {flatInfo?.role === 'admin' && (
                             <button 
-                              onClick={() => setDeletingId(t.id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeletingId(transaction.id);
+                              }}
                               className="p-2 text-rose-600/60 hover:text-rose-600 hover:bg-rose-50 rounded-full transition-all"
                               title="Delete Transaction"
                             >
@@ -1223,21 +1213,23 @@ function Dashboard() {
               <div className="flex-1">
                 <InstallPWA alwaysShow={true} />
               </div>
-              <button
-                onClick={() => {
-                  try {
-                    OneSignal.Slidedown.promptPush();
-                  } catch (e) {
-                    console.error("OneSignal prompt error:", e);
-                    alert("Notification prompt is not available at the moment.");
-                  }
-                }}
-                className="flex items-center justify-center gap-2 bg-[#5A5A40] text-white px-6 py-3 rounded-2xl font-medium hover:bg-[#4A4A30] transition-all text-xs font-bold uppercase tracking-widest shadow-lg shadow-[#5A5A40]/20"
-                title="Enable Notifications"
-              >
-                <Bell className="w-4 h-4" />
-                {t('dash.notify') || 'Notify'}
-              </button>
+              {!isSubscribed && (
+                <button
+                  onClick={() => {
+                    try {
+                      OneSignal.Slidedown.promptPush();
+                    } catch (e) {
+                      console.error("OneSignal prompt error:", e);
+                      alert("Notification prompt is not available at the moment.");
+                    }
+                  }}
+                  className="flex items-center justify-center gap-2 bg-[#5A5A40] text-white px-6 py-3 rounded-2xl font-medium hover:bg-[#4A4A30] transition-all text-xs font-bold uppercase tracking-widest shadow-lg shadow-[#5A5A40]/20"
+                  title="Enable Notifications"
+                >
+                  <Bell className="w-4 h-4" />
+                  {t('dash.notify') || 'Notify'}
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -1267,6 +1259,92 @@ function Dashboard() {
           </div>
         </div>
       </footer>
+
+      {/* Transaction Details Modal */}
+      <AnimatePresence>
+        {selectedTransactionForDetails && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedTransactionForDetails(null)}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-md bg-white rounded-[32px] p-8 shadow-2xl overflow-hidden"
+            >
+              <div className={cn(
+                "absolute top-0 left-0 w-full h-2",
+                selectedTransactionForDetails.type === 'income' ? "bg-emerald-500" : "bg-rose-500"
+              )} />
+              
+              <div className="flex justify-between items-start mb-6">
+                <div>
+                  <h3 className="text-2xl font-serif">{selectedTransactionForDetails.category}</h3>
+                  <p className="text-sm text-[#5A5A40]/60">
+                    {selectedTransactionForDetails.date ? format(selectedTransactionForDetails.date.toDate(), 'MMMM d, yyyy • h:mm a') : 'Processing...'}
+                  </p>
+                </div>
+                <div className={cn(
+                  "px-4 py-2 rounded-xl text-sm font-bold uppercase tracking-widest",
+                  selectedTransactionForDetails.type === 'income' ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
+                )}>
+                  {selectedTransactionForDetails.type}
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                <div className="bg-[#F5F5F0] p-6 rounded-2xl">
+                  <p className="text-xs uppercase tracking-widest text-[#5A5A40]/40 mb-1 font-bold">Amount</p>
+                  <p className={cn(
+                    "text-4xl font-serif",
+                    selectedTransactionForDetails.type === 'income' ? "text-emerald-600" : "text-rose-600"
+                  )}>
+                    ₹{selectedTransactionForDetails.amount.toLocaleString()}
+                  </p>
+                </div>
+
+                {selectedTransactionForDetails.description && (
+                  <div>
+                    <p className="text-xs uppercase tracking-widest text-[#5A5A40]/40 mb-2 font-bold">Description</p>
+                    <p className="text-[#5A5A40] leading-relaxed bg-[#F5F5F0]/50 p-4 rounded-2xl border border-black/5">
+                      {selectedTransactionForDetails.description}
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between pt-6 border-t border-black/5">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-widest text-[#5A5A40]/40 font-bold">Recorded By</p>
+                    <p className="font-medium text-[#5A5A40]">Flat {selectedTransactionForDetails.createdBy}</p>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      setSelectedTransactionForComments(selectedTransactionForDetails);
+                      setSelectedTransactionForDetails(null);
+                    }}
+                    className="flex items-center gap-2 bg-[#5A5A40] text-white px-6 py-3 rounded-full text-xs font-bold uppercase tracking-widest hover:bg-[#4A4A30] transition-colors"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-message-circle"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>
+                    Comments
+                  </button>
+                </div>
+
+                <button 
+                  onClick={() => setSelectedTransactionForDetails(null)}
+                  className="w-full py-4 rounded-full font-bold text-xs uppercase tracking-widest text-[#5A5A40] bg-[#F5F5F0] hover:bg-black/5 transition-colors mt-4"
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Add Transaction Modal */}
       <AnimatePresence>
@@ -1477,6 +1555,48 @@ function Dashboard() {
         )}
       </AnimatePresence>
 
+      {/* Delete Notice Confirmation Modal */}
+      <AnimatePresence>
+        {deletingNoticeId && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setDeletingNoticeId(null)}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-sm bg-white rounded-[32px] p-8 shadow-2xl text-center"
+            >
+              <div className="w-16 h-16 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Trash2 className="w-8 h-8" />
+              </div>
+              <h3 className="text-2xl font-serif mb-2">{t('del.title')}</h3>
+              <p className="text-[#5A5A40]/60 mb-8">Are you sure you want to delete this notice? This action cannot be undone.</p>
+              
+              <div className="flex gap-4">
+                <button 
+                  onClick={() => setDeletingNoticeId(null)}
+                  className="flex-1 py-3 rounded-full font-medium text-[#5A5A40] bg-[#F5F5F0] hover:bg-black/5 transition-colors"
+                >
+                  {t('cancel')}
+                </button>
+                <button 
+                  onClick={() => confirmDeleteNotice(deletingNoticeId)}
+                  className="flex-1 bg-rose-600 text-white py-3 rounded-full font-medium hover:bg-rose-700 transition-colors"
+                >
+                  {t('del.confirm')}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Delete Confirmation Modal */}
       <AnimatePresence>
         {deletingId && (
@@ -1514,6 +1634,165 @@ function Dashboard() {
                 >
                   {t('del.confirm')}
                 </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      
+      {/* Add/Edit Notice Modal */}
+      <AnimatePresence>
+        {isAddingNotice && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                setIsAddingNotice(false);
+                setEditingNotice(null);
+              }}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-md bg-white rounded-[32px] p-8 shadow-2xl"
+            >
+              <h3 className="text-2xl font-serif mb-6">{editingNotice ? 'Edit Notice' : 'Add Notice'}</h3>
+              
+              {noticeError && (
+                <div className="mb-6 p-4 bg-rose-50 text-rose-600 rounded-2xl text-sm font-medium">
+                  {noticeError}
+                </div>
+              )}
+
+              <form onSubmit={addNotice} className="space-y-6">
+                <div>
+                  <label className="block text-xs uppercase tracking-widest text-[#5A5A40] mb-2 font-medium">Title</label>
+                  <input 
+                    name="title"
+                    type="text"
+                    required
+                    defaultValue={editingNotice?.title || ''}
+                    placeholder="Notice Title"
+                    className="w-full px-6 py-4 bg-[#F5F5F0] border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40]/20 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs uppercase tracking-widest text-[#5A5A40] mb-2 font-medium">Content</label>
+                  <textarea 
+                    name="content"
+                    required
+                    rows={4}
+                    defaultValue={editingNotice?.content || ''}
+                    placeholder="Notice Content"
+                    className="w-full px-6 py-4 bg-[#F5F5F0] border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40]/20 outline-none resize-none"
+                  />
+                </div>
+
+                <div className="flex gap-4 pt-4">
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      setIsAddingNotice(false);
+                      setEditingNotice(null);
+                    }}
+                    className="flex-1 py-4 rounded-full font-medium text-[#5A5A40] bg-[#F5F5F0] hover:bg-black/5 transition-colors"
+                  >
+                    {t('cancel')}
+                  </button>
+                  <button 
+                    type="submit"
+                    className="flex-1 bg-[#5A5A40] text-white py-4 rounded-full font-medium hover:bg-[#4A4A30] transition-colors"
+                  >
+                    {editingNotice ? 'Update Notice' : 'Post Notice'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Transaction Details Modal */}
+      <AnimatePresence>
+        {selectedTransactionForDetails && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedTransactionForDetails(null)}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-md bg-white rounded-[32px] p-8 shadow-2xl"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <div className={cn(
+                  "w-12 h-12 rounded-xl flex items-center justify-center",
+                  selectedTransactionForDetails.type === 'income' ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
+                )}>
+                  {selectedTransactionForDetails.type === 'income' ? <TrendingUp className="w-6 h-6" /> : <TrendingDown className="w-6 h-6" />}
+                </div>
+                <button 
+                  onClick={() => setSelectedTransactionForDetails(null)}
+                  className="p-2 hover:bg-black/5 rounded-full transition-colors"
+                >
+                  <X className="w-6 h-6 text-[#5A5A40]" />
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-3xl font-serif text-[#1A1A1A]">
+                    {selectedTransactionForDetails.type === 'income' ? '+' : '-'} ₹{selectedTransactionForDetails.amount.toLocaleString()}
+                  </h3>
+                  <p className="text-[#5A5A40]/60 font-medium uppercase tracking-widest text-[10px] mt-1">
+                    {selectedTransactionForDetails.category}
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="p-6 bg-[#F5F5F0] rounded-2xl">
+                    <label className="block text-[10px] uppercase tracking-widest text-[#5A5A40]/40 mb-2 font-bold">Description</label>
+                    <p className="text-[#1A1A1A] leading-relaxed">
+                      {selectedTransactionForDetails.description || 'No description provided.'}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-4 bg-[#F5F5F0] rounded-2xl">
+                      <label className="block text-[10px] uppercase tracking-widest text-[#5A5A40]/40 mb-1 font-bold">Date</label>
+                      <p className="text-sm font-medium">
+                        {selectedTransactionForDetails.date ? format(selectedTransactionForDetails.date.toDate(), 'MMM d, yyyy') : 'N/A'}
+                      </p>
+                    </div>
+                    <div className="p-4 bg-[#F5F5F0] rounded-2xl">
+                      <label className="block text-[10px] uppercase tracking-widest text-[#5A5A40]/40 mb-1 font-bold">Recorded By</label>
+                      <p className="text-sm font-medium">{selectedTransactionForDetails.createdBy}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-4 pt-4">
+                  <button 
+                    onClick={() => {
+                      setSelectedTransactionForComments(selectedTransactionForDetails);
+                      setSelectedTransactionForDetails(null);
+                    }}
+                    className="flex-1 flex items-center justify-center gap-2 bg-[#5A5A40] text-white py-4 rounded-full font-medium hover:bg-[#4A4A30] transition-colors"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-message-circle"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>
+                    View Comments
+                  </button>
+                </div>
               </div>
             </motion.div>
           </div>

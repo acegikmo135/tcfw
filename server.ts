@@ -76,7 +76,12 @@ async function startServer() {
   app.post("/api/notify", async (req, res) => {
     try {
       const { title, message, url, data } = req.body;
-      if (!oneSignalClient) return res.status(503).json({ error: "OneSignal not configured" });
+      console.log("Incoming notification request:", { title, message, url, data });
+      
+      if (!oneSignalClient) {
+        console.error("OneSignal client not initialized. Check ONESIGNAL_APP_ID and ONESIGNAL_REST_API_KEY.");
+        return res.status(503).json({ error: "OneSignal not configured" });
+      }
 
       const notification = {
         contents: {
@@ -90,10 +95,12 @@ async function startServer() {
         data: data || {}
       };
 
+      console.log("Sending notification to OneSignal:", notification);
       const response = await oneSignalClient.createNotification(notification);
+      console.log("OneSignal response:", response);
       res.json({ success: true, response });
     } catch (error) {
-      console.error("OneSignal error:", error);
+      console.error("OneSignal error details:", error);
       res.status(500).json({ error: "Failed to send notification" });
     }
   });
