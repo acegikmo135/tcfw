@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+/// <reference types="vite/client" />
+import React, { Component, useState, useEffect, useMemo } from 'react';
 import { 
   collection, 
   addDoc, 
@@ -11,26 +12,34 @@ import {
   getDoc,
   setDoc,
   getDocFromServer,
-  deleteDoc
+  deleteDoc,
+  updateDoc,
+  increment,
+  where
 } from 'firebase/firestore';
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
   onAuthStateChanged, 
   signOut, 
+  signInWithCustomToken,
   User 
 } from 'firebase/auth';
-import { db, auth } from './firebase';
+import { db, auth, handleFirestoreError, OperationType } from './firebase';
 import { 
   LayoutDashboard, 
   PlusCircle, 
   LogOut, 
-  TrendingUp, 
-  TrendingDown, 
-  Wrench, 
-  Zap, 
-  Shield, 
-  Trash2, 
+  Bell,
+  Pin,
+  Edit2,
+  X,
+  TrendingUp,
+  TrendingDown,
+  Wrench,
+  Zap,
+  Shield,
+  Trash2,
   Building2,
   Lock,
   User as UserIcon,
@@ -38,8 +47,12 @@ import {
   AlertCircle,
   Download,
   Search,
-  Filter
+  Filter,
+  Eye,
+  EyeOff,
+  Smartphone
 } from 'lucide-react';
+import OneSignal from 'react-onesignal';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { 
@@ -61,6 +74,8 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, startOf
 import { BrowserRouter, Routes, Route, Link, useNavigate } from 'react-router-dom';
 import { AdminPanel } from './components/AdminPanel';
 import { InstallPWA } from './components/InstallPWA';
+import { CommentsModal } from './components/CommentsModal';
+import { Profile } from './components/Profile';
 import { LanguageProvider, useLanguage } from './contexts/LanguageContext';
 import { motion, AnimatePresence } from 'motion/react';
 import jsPDF from 'jspdf';
@@ -72,6 +87,7 @@ function cn(...inputs: ClassValue[]) {
 }
 
 // --- Types ---
+
 type TransactionType = 'income' | 'expense';
 
 interface Transaction {
@@ -82,11 +98,21 @@ interface Transaction {
   description: string;
   date: Timestamp;
   createdBy: string;
+  commentCount?: number;
 }
 
 interface FlatInfo {
   flatNo: string;
   role: 'admin' | 'resident';
+}
+
+interface Notice {
+  id: string;
+  title: string;
+  content: string;
+  createdBy: string;
+  createdAt: Timestamp;
+  isPinned?: boolean;
 }
 
 const CATEGORIES = [
@@ -113,12 +139,24 @@ function Dashboard() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [selectedTransactionForComments, setSelectedTransactionForComments] = useState<Transaction | null>(null);
+  const [selectedTransactionForDetails, setSelectedTransactionForDetails] = useState<Transaction | null>(null);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [loginFlatNo, setLoginFlatNo] = useState('');
   const [exportType, setExportType] = useState<'monthly' | 'yearly'>('monthly');
   const [exportYear, setExportYear] = useState(new Date().getFullYear());
   const [exportMonth, setExportMonth] = useState(new Date().getMonth());
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
+  const [notices, setNotices] = useState<Notice[]>([]);
+  const [categories, setCategories] = useState<{id: string, name: string}[]>([]);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [isAddingNotice, setIsAddingNotice] = useState(false);
+  const [editingNotice, setEditingNotice] = useState<Notice | null>(null);
+  const [deletingNoticeId, setDeletingNoticeId] = useState<string | null>(null);
+  const [noticeError, setNoticeError] = useState("");
+  const [isSubscribed, setIsSubscribed] = useState(false);
 
   // Chart State
   const [chartView, setChartView] = useState<'pie' | 'line'>('pie');
@@ -139,7 +177,87 @@ function Dashboard() {
     return Array.from(uniqueYears).sort((a, b) => b - a);
   }, [transactions]);
 
-  // Auth Listener
+  // Connection Test
+  useEffect(() => {
+    async function testConnection() {
+      try {
+        await getDocFromServer(doc(db, 'test', 'connection'));
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('the client is offline')) {
+          console.error("Please check your Firebase configuration.");
+          setConnectionError("Firestore is offline. Please check your Firebase configuration.");
+        }
+      }
+    }
+    testConnection();
+  }, []);
+
+  // OneSignal initialization
+  useEffect(() => {
+    const initOneSignal = async () => {
+      const appId = import.meta.env.VITE_ONESIGNAL_APP_ID;
+      if (!appId) return;
+      try {
+        await OneSignal.init({
+          appId,
+          allowLocalhostAsSecureOrigin: true,
+          serviceWorkerParam: { scope: '/' },
+          serviceWorkerPath: 'OneSignalSDKWorker.js',
+        });
+        
+        // Check initial subscription status
+        const pushId = await OneSignal.User.PushSubscription.id;
+        const optedIn = OneSignal.User.PushSubscription.optedIn;
+        setIsSubscribed(!!pushId && optedIn);
+        
+        // Listen for changes
+        OneSignal.User.PushSubscription.addEventListener('change', (event) => {
+          setIsSubscribed(!!event.current.id && event.current.optedIn);
+        });
+      } catch (e) {
+        console.error("OneSignal init error:", e);
+      }
+    };
+    initOneSignal();
+  }, []);
+
+  // Initialize Default Categories
+  useEffect(() => {
+    const initCategories = async () => {
+      const defaultCategories = [
+        { id: 'plumbing', name: 'Plumbing' },
+        { id: 'wiring', name: 'Wiring' },
+        { id: 'maintenance', name: 'Maintenance' },
+        { id: 'security', name: 'Security' },
+        { id: 'cleaning', name: 'Cleaning' },
+        { id: 'others', name: 'Others' }
+      ];
+      
+      try {
+        const q = query(collection(db, 'categories'));
+        const snap = await getDocFromServer(doc(db, 'test', 'check')); // Dummy check
+        // We'll just check if the collection is empty in the onSnapshot below
+      } catch (e) {}
+    };
+    initCategories();
+  }, []);
+
+  useEffect(() => {
+    const q = query(collection(db, 'categories'), orderBy('name', 'asc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({
+        id: doc.id,
+        name: doc.data().name
+      }));
+      if (data.length === 0) {
+        setCategories(CATEGORIES.map(c => ({ id: c.id, name: c.name })));
+      } else {
+        setCategories(data);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
       try {
@@ -174,24 +292,108 @@ function Dashboard() {
       })) as Transaction[];
       setTransactions(data);
     }, (error) => {
-      console.error("Firestore Error: ", error);
+      handleFirestoreError(error, OperationType.GET, 'transactions');
     });
     return () => unsubscribe();
   }, [user]);
 
-  // Connection Test
+  // Notices Listener
   useEffect(() => {
-    async function testConnection() {
-      try {
-        await getDocFromServer(doc(db, 'test', 'connection'));
-      } catch (error) {
-        if (error instanceof Error && error.message.includes('the client is offline')) {
-          console.error("Please check your Firebase configuration.");
-        }
-      }
+    if (!user) return;
+    const q = query(collection(db, 'notices'), orderBy('isPinned', 'desc'), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Notice[];
+      setNotices(data);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'notices');
+    });
+    return () => unsubscribe();
+  }, [user]);
+
+  const addNotice = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setNoticeError("");
+    const formData = new FormData(e.currentTarget);
+    const title = (formData.get('title') as string).trim();
+    const content = (formData.get('content') as string).trim();
+
+    if (!title || !content) {
+      setNoticeError("Please fill all fields.");
+      return;
     }
-    testConnection();
-  }, []);
+
+    try {
+      if (!user || !user.email) throw new Error("Not authenticated");
+      
+      if (editingNotice) {
+        await updateDoc(doc(db, 'notices', editingNotice.id), {
+          title,
+          content
+        });
+        
+        // Trigger notification for update
+        fetch('/api/notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: "Notice Updated",
+            message: `${title}: ${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`,
+            url: window.location.origin
+          })
+        }).catch(err => console.error("Notification error:", err));
+      } else {
+        await addDoc(collection(db, 'notices'), {
+          title,
+          content,
+          createdBy: flatInfo?.flatNo || user.email.split('@')[0],
+          createdAt: serverTimestamp(),
+          isPinned: false
+        });
+
+        // Trigger notification
+        fetch('/api/notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: "New Notice",
+            message: `${title}: ${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`,
+            url: window.location.origin
+          })
+        }).catch(err => console.error("Notification error:", err));
+      }
+      
+      setIsAddingNotice(false);
+      setEditingNotice(null);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, 'notices');
+    }
+  };
+
+  const deleteNotice = async (id: string) => {
+    setDeletingNoticeId(id);
+  };
+
+  const confirmDeleteNotice = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'notices', id));
+      setDeletingNoticeId(null);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `notices/${id}`);
+    }
+  };
+
+  const togglePinNotice = async (notice: Notice) => {
+    try {
+      await updateDoc(doc(db, 'notices', notice.id), {
+        isPinned: !notice.isPinned
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `notices/${notice.id}`);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -206,35 +408,46 @@ function Dashboard() {
       // Try to sign in
       await signInWithEmailAndPassword(auth, email, password);
     } catch (err: any) {
-      console.error("Login error:", err.code, err.message);
+      console.error("Login error code:", err.code);
+      console.error("Login error message:", err.message);
       
       // Auto-bootstrap predefined users
       const predefined = PREDEFINED_USERS.find(u => u.flatNo.toUpperCase() === flatNo.toUpperCase() && u.password === password);
       
-      if (predefined && (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-login-credentials')) {
-        try {
-          const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-          const docRef = doc(db, 'flats', flatNo.toLowerCase());
-          const docSnap = await getDoc(docRef);
-          if (!docSnap.exists()) {
-            await setDoc(docRef, {
-              flatNo: predefined.flatNo,
-              role: predefined.role
-            });
+      if (predefined) {
+        if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-login-credentials') {
+          try {
+            // Try to create user if not found
+            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            const docRef = doc(db, 'flats', flatNo.toLowerCase());
+            const docSnap = await getDoc(docRef);
+            if (!docSnap.exists()) {
+              await setDoc(docRef, {
+                flatNo: predefined.flatNo,
+                role: predefined.role
+              });
+            }
+            setUser(userCredential.user);
+            return;
+          } catch (bootstrapErr: any) {
+            if (bootstrapErr.code === 'auth/email-already-in-use') {
+              // User exists but password might be wrong or some other issue
+              setAuthError("Incorrect password for this flat.");
+            } else {
+              console.error("Bootstrap error:", bootstrapErr);
+              setAuthError("Failed to initialize user account.");
+            }
+            return;
           }
-          setUser(userCredential.user);
-          return;
-        } catch (bootstrapErr: any) {
-          console.error("Bootstrap error:", bootstrapErr);
-          setAuthError("Failed to initialize predefined user.");
-          return;
         }
       }
 
       if (err.code === 'auth/operation-not-allowed') {
         setAuthError("Email/Password login is not enabled in Firebase Console.");
-      } else {
+      } else if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-login-credentials') {
         setAuthError("Invalid Flat Number or Password.");
+      } else {
+        setAuthError(err.message || "An error occurred during login.");
       }
     }
   };
@@ -245,8 +458,8 @@ function Dashboard() {
     setDeletingId(null);
     try {
       await deleteDoc(doc(db, 'transactions', id));
-    } catch (err) {
-      console.error("Delete error:", err);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `transactions/${id}`);
     }
   };
 
@@ -415,49 +628,58 @@ function Dashboard() {
     }
   }, [transactions, chartView, timeRange, selectedYear, selectedMonth]);
 
-  const COLORS = ['#1d4ed8', '#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe', '#dbeafe'];
+  const COLORS = ['#5A5A40', '#8E8E6B', '#C2C296', '#E6E6D1', '#A3A375', '#70704F'];
 
   if (!user && !loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-[#F5F5F0] flex items-center justify-center p-4">
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-md bg-white rounded-2xl p-8 shadow-xl border border-black/5"
+          className="w-full max-w-md bg-white rounded-[32px] p-8 shadow-sm border border-black/5"
         >
           <div className="flex flex-col items-center mb-8">
-            <div className="w-16 h-16 bg-blue-700 rounded-full flex items-center justify-center mb-4 overflow-hidden">
+            <div className="w-16 h-16 bg-[#5A5A40] rounded-full flex items-center justify-center mb-4 overflow-hidden">
               <img src="https://raw.githubusercontent.com/acegikmo135/assets/main/vbub4efh.jpg" alt="Logo" className="w-full h-full object-cover" />
             </div>
-            <h1 className="text-3xl font-sans font-bold text-gray-900">{t('app.title')}</h1>
-            <p className="text-blue-700/60 font-sans italic text-center">{t('app.subtitle')}</p>
+            <h1 className="text-3xl font-serif text-[#1A1A1A]">{t('app.title')}</h1>
+            <p className="text-[#5A5A40]/60 font-serif italic text-center">{t('app.subtitle')}</p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-6">
             <div>
-              <label className="block text-xs uppercase tracking-widest text-blue-700 mb-2 font-bold">{t('login.flatNo')}</label>
+              <label className="block text-xs uppercase tracking-widest text-[#5A5A40] mb-2 font-medium">{t('login.flatNo')}</label>
               <div className="relative">
-                <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-700/40" />
+                <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#5A5A40]/40" />
                 <input 
                   name="flatNo"
                   required
+                  value={loginFlatNo}
+                  onChange={(e) => setLoginFlatNo(e.target.value)}
                   placeholder={t('login.flatNoPlaceholder')}
-                  className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                  className="w-full pl-12 pr-4 py-3 bg-[#F5F5F0] border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40]/20 outline-none transition-all"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs uppercase tracking-widest text-blue-700 mb-2 font-bold">{t('login.password')}</label>
+              <label className="block text-xs uppercase tracking-widest text-[#5A5A40] mb-2 font-medium">{t('login.password')}</label>
               <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-700/40" />
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#5A5A40]/40" />
                 <input 
                   name="password"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   required
                   placeholder={t('login.passwordPlaceholder')}
-                  className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                  className="w-full pl-12 pr-12 py-3 bg-[#F5F5F0] border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40]/20 outline-none transition-all"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 p-1 text-[#5A5A40]/40 hover:text-[#5A5A40] transition-colors"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
             </div>
 
@@ -470,33 +692,33 @@ function Dashboard() {
 
             <button 
               type="submit"
-              className="w-full bg-blue-700 text-white py-4 rounded-full font-bold hover:bg-blue-800 transition-colors shadow-lg shadow-blue-700/20"
+              className="w-full bg-[#5A5A40] text-white py-4 rounded-full font-medium hover:bg-[#4A4A30] transition-colors shadow-lg shadow-[#5A5A40]/20"
             >
               {t('login.enter')}
             </button>
           </form>
 
           <div className="mt-8 pt-6 border-t border-black/5 text-center space-y-4">
-            <p className="text-xs text-blue-700/40 uppercase tracking-tighter">
+            <p className="text-xs text-[#5A5A40]/40 uppercase tracking-tighter">
               {t('login.authorized')}
             </p>
             <div className="pt-4 space-y-3">
-              <p className="text-sm font-sans font-semibold text-blue-700">Made by Manthan - F602</p>
+              <p className="text-sm font-serif text-[#5A5A40]">Made by Manthan - F602</p>
               <div className="flex flex-col items-center gap-2">
                 <a 
-                  href="https://manthank.com" 
+                  href={window.location.href} 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  className="text-xs font-bold uppercase tracking-widest text-white bg-blue-700 px-4 py-2 rounded-full hover:bg-blue-800 transition-colors"
+                  className="text-xs font-bold uppercase tracking-widest text-white bg-[#5A5A40] px-4 py-2 rounded-full hover:bg-[#4A4A30] transition-colors"
                 >
-                  Visit Website
+                  Open in New Tab
                 </a>
-                <p className="text-xs text-blue-700/60 mt-2">If any issue, contact dev@manthank.com</p>
+                <p className="text-xs text-[#5A5A40]/60 mt-2">If any issue, contact dev@manthank.com</p>
                 <a 
                   href="https://mail.google.com/mail/?view=cm&fs=1&to=dev@manthank.com" 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  className="text-xs font-bold uppercase tracking-widest text-blue-700 border border-blue-700/20 px-4 py-2 rounded-full hover:bg-gray-50 transition-colors"
+                  className="text-xs font-bold uppercase tracking-widest text-[#5A5A40] border border-[#5A5A40]/20 px-4 py-2 rounded-full hover:bg-[#F5F5F0] transition-colors"
                 >
                   Email Support
                 </a>
@@ -509,17 +731,17 @@ function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
+    <div className="min-h-screen bg-[#F5F5F0] text-[#1A1A1A] font-sans">
       {/* Header */}
       <header className="bg-white border-b border-black/5 sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-4 h-20 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-700 rounded-xl flex items-center justify-center overflow-hidden">
+            <div className="w-10 h-10 bg-[#5A5A40] rounded-xl flex items-center justify-center overflow-hidden">
               <img src="https://raw.githubusercontent.com/acegikmo135/assets/main/vbub4efh.jpg" alt="Logo" className="w-full h-full object-cover" />
             </div>
             <div>
-              <h2 className="font-sans font-bold text-lg leading-tight">{t('app.title')}</h2>
-              <p className="text-xs text-blue-700/60 font-bold uppercase tracking-widest">
+              <h2 className="font-serif text-lg leading-tight">{t('app.title')}</h2>
+              <p className="text-xs text-[#5A5A40]/60 font-medium uppercase tracking-widest">
                 {t('login.flatNo')} {flatInfo?.flatNo} • {flatInfo?.role === 'admin' ? t('admin.admin') : t('admin.resident')}
               </p>
             </div>
@@ -527,14 +749,20 @@ function Dashboard() {
           <div className="flex items-center gap-4">
             <button
               onClick={() => setLanguage(language === 'en' ? 'gu' : 'en')}
-              className="text-xs font-bold uppercase tracking-widest text-blue-700/60 hover:text-blue-700 transition-colors"
+              className="text-xs font-bold uppercase tracking-widest text-[#5A5A40]/60 hover:text-[#5A5A40] transition-colors"
             >
               {language === 'en' ? 'GU' : 'EN'}
             </button>
+            <Link 
+              to="/profile" 
+              className="p-2 hover:bg-[#F5F5F0] rounded-full transition-colors text-[#5A5A40]"
+            >
+              <UserIcon className="w-5 h-5" />
+            </Link>
             {flatInfo?.role === 'admin' && (
               <Link 
                 to="/adminpanel" 
-                className="hidden sm:flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-blue-700/40 hover:text-blue-700 transition-colors"
+                className="hidden sm:flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[#5A5A40]/40 hover:text-[#5A5A40] transition-colors"
               >
                 <Shield className="w-4 h-4" />
                 {t('dash.adminPanel')}
@@ -542,7 +770,7 @@ function Dashboard() {
             )}
             <button 
               onClick={handleLogout}
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors text-blue-700"
+              className="p-2 hover:bg-[#F5F5F0] rounded-full transition-colors text-[#5A5A40]"
             >
               <LogOut className="w-5 h-5" />
             </button>
@@ -566,10 +794,10 @@ function Dashboard() {
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 whileHover={{ scale: 1.02, y: -5 }}
                 transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                className="bg-white p-6 rounded-2xl shadow-sm border border-black/5 cursor-default"
+                className="bg-white p-6 rounded-[32px] shadow-sm border border-black/5 cursor-default"
               >
-                <p className="text-xs uppercase tracking-widest text-blue-700/60 mb-2 font-medium">{t('dash.totalBalance')}</p>
-                <h3 className="text-4xl font-sans font-bold">₹{balance.toLocaleString()}</h3>
+                <p className="text-xs uppercase tracking-widest text-[#5A5A40]/60 mb-2 font-medium">{t('dash.totalBalance')}</p>
+                <h3 className="text-4xl font-serif">₹{balance.toLocaleString()}</h3>
               </motion.div>
 
               <motion.div 
@@ -577,13 +805,13 @@ function Dashboard() {
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 whileHover={{ scale: 1.02, y: -5 }}
                 transition={{ delay: 0.1, type: "spring", stiffness: 300, damping: 20 }}
-                className="bg-white p-6 rounded-2xl shadow-sm border border-black/5 cursor-default"
+                className="bg-white p-6 rounded-[32px] shadow-sm border border-black/5 cursor-default"
               >
                 <div className="flex items-center gap-2 text-emerald-600 mb-2">
                   <TrendingUp className="w-4 h-4" />
                   <p className="text-xs uppercase tracking-widest font-medium">{t('income')}</p>
                 </div>
-                <h3 className="text-3xl font-sans font-bold">₹{totalIncome.toLocaleString()}</h3>
+                <h3 className="text-3xl font-serif">₹{totalIncome.toLocaleString()}</h3>
               </motion.div>
 
               <motion.div 
@@ -591,57 +819,28 @@ function Dashboard() {
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 whileHover={{ scale: 1.02, y: -5 }}
                 transition={{ delay: 0.2, type: "spring", stiffness: 300, damping: 20 }}
-                className="bg-white p-6 rounded-2xl shadow-sm border border-black/5 cursor-default"
+                className="bg-white p-6 rounded-[32px] shadow-sm border border-black/5 cursor-default"
               >
                 <div className="flex items-center gap-2 text-rose-600 mb-2">
                   <TrendingDown className="w-4 h-4" />
                   <p className="text-xs uppercase tracking-widest font-medium">{t('expense')}</p>
                 </div>
-                <h3 className="text-3xl font-sans font-bold">₹{totalExpense.toLocaleString()}</h3>
+                <h3 className="text-3xl font-serif">₹{totalExpense.toLocaleString()}</h3>
               </motion.div>
             </>
           )}
         </div>
-
-        {/* Notice Div - Moved here as requested */}
-        {!loading && (
-          <motion.div 
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className={cn(
-              "p-6 rounded-2xl border-2 flex items-start gap-4 shadow-md",
-              balance > 0 
-                ? "bg-emerald-50 border-emerald-200 text-emerald-800" 
-                : "bg-rose-50 border-rose-200 text-rose-800"
-            )}
-          >
-            <div className={cn(
-              "p-3 rounded-xl",
-              balance > 0 ? "bg-emerald-100" : "bg-rose-100"
-            )}>
-              <AlertCircle className="w-6 h-6" />
-            </div>
-            <div>
-              <h3 className="text-lg font-sans font-bold mb-1">{t('dash.health')}</h3>
-              <p className="text-sm opacity-90 leading-relaxed font-medium">
-                {balance > 0 
-                  ? t('dash.healthGood')
-                  : t('dash.healthBad')}
-              </p>
-            </div>
-          </motion.div>
-        )}
 
         {/* Actions & List */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Transaction List */}
           <div className="lg:col-span-2 space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <h3 className="text-xl font-sans font-bold">{t('dash.recent')}</h3>
+              <h3 className="text-xl font-serif">{t('dash.recent')}</h3>
               <div className="flex items-center gap-2">
                 <button 
                   onClick={() => setIsExportModalOpen(true)}
-                  className="flex items-center gap-2 bg-white border border-gray-200 text-blue-700 px-4 py-2 rounded-full text-sm font-bold hover:bg-gray-50 transition-colors"
+                  className="flex items-center gap-2 bg-white border border-black/5 text-[#5A5A40] px-4 py-2 rounded-full text-sm font-medium hover:bg-[#F5F5F0] transition-colors"
                 >
                   <Download className="w-4 h-4" />
                   {t('dash.export')}
@@ -649,7 +848,7 @@ function Dashboard() {
                 {flatInfo?.role === 'admin' && (
                   <button 
                     onClick={() => setIsAdding(true)}
-                    className="flex items-center gap-2 bg-blue-700 text-white px-4 py-2 rounded-full text-sm font-bold hover:bg-blue-800 transition-colors"
+                    className="flex items-center gap-2 bg-[#5A5A40] text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-[#4A4A30] transition-colors"
                   >
                     <PlusCircle className="w-4 h-4" />
                     {t('dash.add')}
@@ -661,28 +860,107 @@ function Dashboard() {
             {/* Filters */}
             <div className="flex flex-col sm:flex-row gap-4">
               <div className="relative flex-1">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-700/40" />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#5A5A40]/40" />
                 <input 
                   type="text"
                   placeholder={t('dash.search')}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-sm"
+                  className="w-full pl-12 pr-4 py-3 bg-white border border-black/5 rounded-2xl focus:ring-2 focus:ring-[#5A5A40]/20 outline-none transition-all text-sm"
                 />
               </div>
-              <div className="flex bg-white border border-gray-200 rounded-xl p-1">
+              <div className="flex bg-white border border-black/5 rounded-2xl p-1">
                 {(['all', 'income', 'expense'] as const).map((type) => (
                   <button
                     key={type}
                     onClick={() => setFilterType(type)}
                     className={cn(
-                      "px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest transition-all",
-                      filterType === type ? "bg-blue-700 text-white shadow-sm" : "text-blue-700/40 hover:text-blue-700"
+                      "px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all",
+                      filterType === type ? "bg-[#5A5A40] text-white shadow-sm" : "text-[#5A5A40]/40 hover:text-[#5A5A40]"
                     )}
                   >
                     {t(type)}
                   </button>
                 ))}
+              </div>
+            </div>
+
+            {/* Notices Section */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-serif">Building Notices</h3>
+                {flatInfo?.role === 'admin' && (
+                  <button 
+                    onClick={() => {
+                      setEditingNotice(null);
+                      setIsAddingNotice(true);
+                    }}
+                    className="text-[#5A5A40] hover:bg-[#5A5A40]/5 p-2 rounded-full transition-colors"
+                  >
+                    <PlusCircle className="w-5 h-5" />
+                  </button>
+                )}
+              </div>
+              
+              <div className="grid grid-cols-1 gap-4">
+                {notices.map((notice) => (
+                  <motion.div 
+                    key={notice.id}
+                    layout
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={cn(
+                      "bg-white p-6 rounded-[32px] shadow-sm border transition-all",
+                      notice.isPinned ? "border-[#5A5A40]/30 bg-[#5A5A40]/5" : "border-black/5"
+                    )}
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-2">
+                          {notice.isPinned && <Pin className="w-4 h-4 text-[#5A5A40]" />}
+                          <h4 className="font-serif text-lg">{notice.title}</h4>
+                        </div>
+                        <p className="text-[10px] uppercase tracking-widest font-bold text-[#5A5A40]/40 mt-1">
+                          {notice.createdAt?.toDate ? notice.createdAt.toDate().toLocaleDateString() : 'Just now'} • By {notice.createdBy}
+                        </p>
+                      </div>
+                      {flatInfo?.role === 'admin' && (
+                        <div className="flex items-center gap-1">
+                          <button 
+                            onClick={() => togglePinNotice(notice)}
+                            className={cn(
+                              "p-2 rounded-full transition-colors",
+                              notice.isPinned ? "text-[#5A5A40] bg-[#5A5A40]/10" : "text-[#5A5A40]/40 hover:bg-[#F5F5F0]"
+                            )}
+                          >
+                            <Pin className="w-4 h-4" />
+                          </button>
+                          <button 
+                            onClick={() => {
+                              setEditingNotice(notice);
+                              setIsAddingNotice(true);
+                            }}
+                            className="p-2 text-[#5A5A40]/40 hover:text-[#5A5A40] hover:bg-[#F5F5F0] rounded-full transition-colors"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button 
+                            onClick={() => deleteNotice(notice.id)}
+                            className="p-2 text-rose-500/40 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-sm text-[#5A5A40]/80 mb-2 whitespace-pre-wrap leading-relaxed">{notice.content}</p>
+                  </motion.div>
+                ))}
+                {notices.length === 0 && (
+                  <div className="text-center py-12 bg-white rounded-[32px] border border-dashed border-[#5A5A40]/20">
+                    <p className="text-[#5A5A40]/40 font-serif italic">No notices at the moment.</p>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -706,57 +984,91 @@ function Dashboard() {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="text-center py-20 bg-white rounded-2xl border border-dashed border-blue-700/20"
+                    className="text-center py-20 bg-white rounded-[32px] border border-dashed border-[#5A5A40]/20"
                   >
-                    <p className="text-blue-700/40 font-sans italic">{t('dash.noTransactions')}</p>
+                    <p className="text-[#5A5A40]/40 font-serif italic">{t('dash.noTransactions')}</p>
                   </motion.div>
                 ) : (
-                  filteredTransactions.map((t) => (
+                  filteredTransactions.map((transaction) => (
                     <motion.div 
-                      key={t.id}
+                      key={transaction.id}
                       layout
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0, x: 20 }}
                       whileHover={{ x: 5 }}
                       transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                      className="bg-white p-5 rounded-xl shadow-sm border border-black/5 flex items-center justify-between group"
+                      onClick={() => setSelectedTransactionForDetails(transaction)}
+                      className="bg-white p-5 rounded-2xl shadow-sm border border-black/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group cursor-pointer"
                     >
-                      <div className="flex items-center gap-4">
-                        <div className={cn(
-                          "w-12 h-12 rounded-xl flex items-center justify-center",
-                          t.type === 'income' ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
-                        )}>
-                          {t.type === 'income' ? <TrendingUp className="w-6 h-6" /> : <TrendingDown className="w-6 h-6" />}
+                      <div className="flex items-center justify-between w-full sm:w-auto gap-4">
+                        <div className="flex items-center gap-4">
+                          <div className={cn(
+                            "w-12 h-12 rounded-xl flex items-center justify-center shrink-0",
+                            transaction.type === 'income' ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
+                          )}>
+                            {transaction.type === 'income' ? <TrendingUp className="w-6 h-6" /> : <TrendingDown className="w-6 h-6" />}
+                          </div>
+                          <div>
+                            <h4 className="font-medium text-[#1A1A1A]">{transaction.category}</h4>
+                            <p className="text-xs text-[#5A5A40]/60">
+                              {transaction.date ? format(transaction.date.toDate(), 'MMM d, yyyy • h:mm a') : 'Processing...'}
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <h4 className="font-bold text-gray-900">{t.category}</h4>
-                          <p className="text-xs text-blue-700/60">
-                            {t.date ? format(t.date.toDate(), 'MMM d, yyyy • h:mm a') : 'Processing...'}
+                        <div className="sm:hidden text-right">
+                          <p className={cn(
+                            "font-serif text-lg",
+                            transaction.type === 'income' ? "text-emerald-600" : "text-rose-600"
+                          )}>
+                            {transaction.type === 'income' ? '+' : '-'} ₹{transaction.amount.toLocaleString()}
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-6">
-                        <div className="text-right">
+                      <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-6 border-t sm:border-none pt-4 sm:pt-0">
+                        <div className="hidden sm:block text-right">
                           <p className={cn(
-                            "font-sans font-bold text-lg",
-                            t.type === 'income' ? "text-emerald-600" : "text-rose-600"
+                            "font-serif text-lg",
+                            transaction.type === 'income' ? "text-emerald-600" : "text-rose-600"
                           )}>
-                            {t.type === 'income' ? '+' : '-'} ₹{t.amount.toLocaleString()}
+                            {transaction.type === 'income' ? '+' : '-'} ₹{transaction.amount.toLocaleString()}
                           </p>
-                          <p className="text-[10px] uppercase tracking-widest text-blue-700/40 font-bold">
-                            By {t.createdBy}
+                          <p className="text-[10px] uppercase tracking-widest text-[#5A5A40]/40 font-medium">
+                            By {transaction.createdBy}
                           </p>
                         </div>
-                        {flatInfo?.role === 'admin' && (
+                        <div className="sm:hidden">
+                          <p className="text-[10px] uppercase tracking-widest text-[#5A5A40]/40 font-medium">
+                            By {transaction.createdBy}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
                           <button 
-                            onClick={() => setDeletingId(t.id)}
-                            className="p-2 text-rose-600/60 hover:text-rose-600 hover:bg-rose-50 rounded-full transition-all"
-                            title="Delete Transaction"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedTransactionForComments(transaction);
+                            }}
+                            className="relative p-2 text-[#5A5A40]/60 hover:text-[#5A5A40] hover:bg-[#F5F5F0] rounded-full transition-all"
+                            title="View Comments"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-message-circle"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>
+                            {transaction.commentCount && transaction.commentCount > 0 && (
+                              <span className="absolute top-1 right-1 w-2 h-2 bg-rose-500 rounded-full border border-white" />
+                            )}
                           </button>
-                        )}
+                          {flatInfo?.role === 'admin' && (
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeletingId(transaction.id);
+                              }}
+                              className="p-2 text-rose-600/60 hover:text-rose-600 hover:bg-rose-50 rounded-full transition-all"
+                              title="Delete Transaction"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </motion.div>
                   ))
@@ -767,14 +1079,14 @@ function Dashboard() {
 
           {/* Charts Sidebar */}
           <div className="space-y-6">
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-black/5">
+            <div className="bg-white p-6 rounded-[32px] shadow-sm border border-black/5">
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-sans font-bold">{t('chart.overview')}</h3>
+                <h3 className="text-lg font-serif">{t('chart.overview')}</h3>
                 <div className="flex gap-2">
                   <select 
                     value={chartView}
                     onChange={(e) => setChartView(e.target.value as any)}
-                    className="text-xs bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 outline-none font-bold"
+                    className="text-xs bg-[#F5F5F0] border-none rounded-lg px-2 py-1 outline-none font-medium"
                   >
                     <option value="pie">{t('chart.pie')}</option>
                     <option value="line">{t('chart.line')}</option>
@@ -787,8 +1099,8 @@ function Dashboard() {
                   <button 
                     onClick={() => setTimeRange('monthly')}
                     className={cn(
-                      "flex-1 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all",
-                      timeRange === 'monthly' ? "bg-blue-700 text-white" : "bg-gray-50 text-blue-700/40"
+                      "flex-1 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all",
+                      timeRange === 'monthly' ? "bg-[#5A5A40] text-white" : "bg-[#F5F5F0] text-[#5A5A40]/40"
                     )}
                   >
                     {t('pdf.monthly')}
@@ -796,8 +1108,8 @@ function Dashboard() {
                   <button 
                     onClick={() => setTimeRange('yearly')}
                     className={cn(
-                      "flex-1 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all",
-                      timeRange === 'yearly' ? "bg-blue-700 text-white" : "bg-gray-50 text-blue-700/40"
+                      "flex-1 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all",
+                      timeRange === 'yearly' ? "bg-[#5A5A40] text-white" : "bg-[#F5F5F0] text-[#5A5A40]/40"
                     )}
                   >
                     {t('pdf.yearly')}
@@ -808,7 +1120,7 @@ function Dashboard() {
                   <select 
                     value={selectedYear}
                     onChange={(e) => setSelectedYear(Number(e.target.value))}
-                    className="flex-1 text-xs bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 outline-none font-bold"
+                    className="flex-1 text-xs bg-[#F5F5F0] border-none rounded-xl px-3 py-2 outline-none font-medium"
                   >
                     {years.map(y => <option key={y} value={y}>{y}</option>)}
                   </select>
@@ -816,7 +1128,7 @@ function Dashboard() {
                     <select 
                       value={selectedMonth}
                       onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                      className="flex-1 text-xs bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 outline-none font-bold"
+                      className="flex-1 text-xs bg-[#F5F5F0] border-none rounded-xl px-3 py-2 outline-none font-medium"
                     >
                       {Array.from({ length: 12 }).map((_, i) => (
                         <option key={i} value={i}>{format(new Date(2024, i), 'MMMM')}</option>
@@ -855,12 +1167,12 @@ function Dashboard() {
                         dataKey="name" 
                         axisLine={false} 
                         tickLine={false} 
-                        tick={{ fontSize: 10, fill: '#1e40af' }} 
+                        tick={{ fontSize: 10, fill: '#5A5A40' }} 
                       />
                       <YAxis 
                         axisLine={false} 
                         tickLine={false} 
-                        tick={{ fontSize: 10, fill: '#1e40af' }}
+                        tick={{ fontSize: 10, fill: '#5A5A40' }}
                         tickFormatter={(value) => `₹${value}`}
                       />
                       <Tooltip 
@@ -887,33 +1199,152 @@ function Dashboard() {
                 </ResponsiveContainer>
               </div>
             </div>
+
+            <div className="bg-[#5A5A40] p-6 rounded-[32px] text-white">
+              <h3 className="text-lg font-serif mb-2">{t('dash.health')}</h3>
+              <p className="text-sm text-white/70 leading-relaxed">
+                {balance > 0 
+                  ? t('dash.healthGood')
+                  : t('dash.healthBad')}
+              </p>
+            </div>
+
+            <div className="mt-4 flex gap-2">
+              <div className="flex-1">
+                <InstallPWA alwaysShow={true} />
+              </div>
+              {!isSubscribed && (
+                <button
+                  onClick={() => {
+                    try {
+                      OneSignal.Slidedown.promptPush();
+                    } catch (e) {
+                      console.error("OneSignal prompt error:", e);
+                      alert("Notification prompt is not available at the moment.");
+                    }
+                  }}
+                  className="flex items-center justify-center gap-2 bg-[#5A5A40] text-white px-6 py-3 rounded-2xl font-medium hover:bg-[#4A4A30] transition-all text-xs font-bold uppercase tracking-widest shadow-lg shadow-[#5A5A40]/20"
+                  title="Enable Notifications"
+                >
+                  <Bell className="w-4 h-4" />
+                  {t('dash.notify') || 'Notify'}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </main>
-       <footer className="max-w-5xl mx-auto px-4 py-8 border-t border-black/5 mt-8 text-center">
-        <p className="text-sm font-sans font-bold text-blue-700 mb-4">Made by Manthan - F602</p>
+
+      <footer className="max-w-5xl mx-auto px-4 py-8 border-t border-black/5 mt-8 text-center">
+        <p className="text-sm font-serif text-[#5A5A40] mb-4">Made by Manthan - F602</p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
           <a 
             href="https://manthank.com" 
             target="_blank" 
             rel="noopener noreferrer"
-            className="text-xs font-bold uppercase tracking-widest text-white bg-blue-700 px-6 py-3 rounded-full hover:bg-blue-800 transition-colors shadow-sm"
+            className="text-xs font-bold uppercase tracking-widest text-white bg-[#5A5A40] px-6 py-3 rounded-full hover:bg-[#4A4A30] transition-colors shadow-sm"
           >
             Visit Website
           </a>
           <div className="flex items-center gap-3">
-            <span className="text-xs text-blue-700/60">If any issue, contact dev@manthank.com</span>
+            <span className="text-xs text-[#5A5A40]/60">If any issue, contact dev@manthank.com</span>
             <a 
               href="https://mail.google.com/mail/?view=cm&fs=1&to=dev@manthank.com" 
               target="_blank" 
               rel="noopener noreferrer"
-              className="text-xs font-bold uppercase tracking-widest text-blue-700 border border-blue-700/20 px-6 py-3 rounded-full hover:bg-gray-50 transition-colors"
+              className="text-xs font-bold uppercase tracking-widest text-[#5A5A40] border border-[#5A5A40]/20 px-6 py-3 rounded-full hover:bg-[#F5F5F0] transition-colors"
             >
               Email Support
             </a>
           </div>
         </div>
       </footer>
+
+      {/* Transaction Details Modal */}
+      <AnimatePresence>
+        {selectedTransactionForDetails && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedTransactionForDetails(null)}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-md bg-white rounded-[32px] p-8 shadow-2xl overflow-hidden"
+            >
+              <div className={cn(
+                "absolute top-0 left-0 w-full h-2",
+                selectedTransactionForDetails.type === 'income' ? "bg-emerald-500" : "bg-rose-500"
+              )} />
+              
+              <div className="flex justify-between items-start mb-6">
+                <div>
+                  <h3 className="text-2xl font-serif">{selectedTransactionForDetails.category}</h3>
+                  <p className="text-sm text-[#5A5A40]/60">
+                    {selectedTransactionForDetails.date ? format(selectedTransactionForDetails.date.toDate(), 'MMMM d, yyyy • h:mm a') : 'Processing...'}
+                  </p>
+                </div>
+                <div className={cn(
+                  "px-4 py-2 rounded-xl text-sm font-bold uppercase tracking-widest",
+                  selectedTransactionForDetails.type === 'income' ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
+                )}>
+                  {selectedTransactionForDetails.type}
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                <div className="bg-[#F5F5F0] p-6 rounded-2xl">
+                  <p className="text-xs uppercase tracking-widest text-[#5A5A40]/40 mb-1 font-bold">Amount</p>
+                  <p className={cn(
+                    "text-4xl font-serif",
+                    selectedTransactionForDetails.type === 'income' ? "text-emerald-600" : "text-rose-600"
+                  )}>
+                    ₹{selectedTransactionForDetails.amount.toLocaleString()}
+                  </p>
+                </div>
+
+                {selectedTransactionForDetails.description && (
+                  <div>
+                    <p className="text-xs uppercase tracking-widest text-[#5A5A40]/40 mb-2 font-bold">Description</p>
+                    <p className="text-[#5A5A40] leading-relaxed bg-[#F5F5F0]/50 p-4 rounded-2xl border border-black/5">
+                      {selectedTransactionForDetails.description}
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between pt-6 border-t border-black/5">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-widest text-[#5A5A40]/40 font-bold">Recorded By</p>
+                    <p className="font-medium text-[#5A5A40]">Flat {selectedTransactionForDetails.createdBy}</p>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      setSelectedTransactionForComments(selectedTransactionForDetails);
+                      setSelectedTransactionForDetails(null);
+                    }}
+                    className="flex items-center gap-2 bg-[#5A5A40] text-white px-6 py-3 rounded-full text-xs font-bold uppercase tracking-widest hover:bg-[#4A4A30] transition-colors"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-message-circle"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>
+                    Comments
+                  </button>
+                </div>
+
+                <button 
+                  onClick={() => setSelectedTransactionForDetails(null)}
+                  className="w-full py-4 rounded-full font-bold text-xs uppercase tracking-widest text-[#5A5A40] bg-[#F5F5F0] hover:bg-black/5 transition-colors mt-4"
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Add Transaction Modal */}
       <AnimatePresence>
@@ -930,9 +1361,9 @@ function Dashboard() {
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-lg bg-white rounded-2xl p-8 shadow-2xl"
+              className="relative w-full max-w-lg bg-white rounded-[32px] p-8 shadow-2xl"
             >
-              <h3 className="text-2xl font-sans font-bold mb-6">{t('tx.new')}</h3>
+              <h3 className="text-2xl font-serif mb-6">{t('tx.new')}</h3>
               <form 
                 onSubmit={async (e) => {
                   e.preventDefault();
@@ -949,9 +1380,18 @@ function Dashboard() {
                   setIsAdding(false);
                   try {
                     await addDoc(collection(db, 'transactions'), data);
-                  } catch (err) {
-                    console.error("Error adding transaction:", err);
-                    alert(t('tx.error'));
+                    // Trigger notification
+                    fetch('/api/notify', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        title: `New ${data.type === 'income' ? 'Income' : 'Expense'}`,
+                        message: `${data.description || data.category}: ₹${data.amount.toLocaleString()} by ${data.createdBy}`,
+                        url: window.location.origin
+                      })
+                    }).catch(err => console.error("Notification error:", err));
+                  } catch (error) {
+                    handleFirestoreError(error, OperationType.CREATE, 'transactions');
                   }
                 }}
                 className="space-y-6"
@@ -959,14 +1399,14 @@ function Dashboard() {
                 <div className="grid grid-cols-2 gap-4">
                   <label className="relative cursor-pointer">
                     <input type="radio" name="type" value="income" defaultChecked className="peer sr-only" />
-                    <div className="p-4 rounded-xl bg-gray-50 border-2 border-transparent peer-checked:border-emerald-500 peer-checked:bg-emerald-50 transition-all text-center">
+                    <div className="p-4 rounded-2xl bg-[#F5F5F0] border-2 border-transparent peer-checked:border-emerald-500 peer-checked:bg-emerald-50 transition-all text-center">
                       <TrendingUp className="w-6 h-6 mx-auto mb-2 text-emerald-600" />
                       <span className="text-xs font-bold uppercase tracking-widest">{t('income')}</span>
                     </div>
                   </label>
                   <label className="relative cursor-pointer">
                     <input type="radio" name="type" value="expense" className="peer sr-only" />
-                    <div className="p-4 rounded-xl bg-gray-50 border-2 border-transparent peer-checked:border-rose-500 peer-checked:bg-rose-50 transition-all text-center">
+                    <div className="p-4 rounded-2xl bg-[#F5F5F0] border-2 border-transparent peer-checked:border-rose-500 peer-checked:bg-rose-50 transition-all text-center">
                       <TrendingDown className="w-6 h-6 mx-auto mb-2 text-rose-600" />
                       <span className="text-xs font-bold uppercase tracking-widest">{t('expense')}</span>
                     </div>
@@ -975,34 +1415,34 @@ function Dashboard() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs uppercase tracking-widest text-blue-700 mb-2 font-bold">{t('tx.amount')} (₹)</label>
+                    <label className="block text-xs uppercase tracking-widest text-[#5A5A40] mb-2 font-medium">{t('tx.amount')} (₹)</label>
                     <input 
                       name="amount"
                       type="number"
                       required
                       placeholder="0.00"
-                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none"
+                      className="w-full px-4 py-3 bg-[#F5F5F0] border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40]/20 outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs uppercase tracking-widest text-blue-700 mb-2 font-bold">{t('tx.category')}</label>
+                    <label className="block text-xs uppercase tracking-widest text-[#5A5A40] mb-2 font-medium">{t('tx.category')}</label>
                     <select 
                       name="category"
                       required
-                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none appearance-none font-bold"
+                      className="w-full px-4 py-3 bg-[#F5F5F0] border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40]/20 outline-none appearance-none"
                     >
-                      {CATEGORIES.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                      {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                     </select>
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs uppercase tracking-widest text-blue-700 mb-2 font-bold">{t('tx.description')}</label>
+                  <label className="block text-xs uppercase tracking-widest text-[#5A5A40] mb-2 font-medium">{t('tx.description')}</label>
                   <textarea 
                     name="description"
                     rows={3}
                     placeholder={t('tx.descPlaceholder')}
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none resize-none"
+                    className="w-full px-4 py-3 bg-[#F5F5F0] border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40]/20 outline-none resize-none"
                   />
                 </div>
 
@@ -1010,13 +1450,13 @@ function Dashboard() {
                   <button 
                     type="button"
                     onClick={() => setIsAdding(false)}
-                    className="flex-1 py-4 rounded-full font-bold text-blue-700 bg-gray-50 hover:bg-gray-100 transition-colors"
+                    className="flex-1 py-4 rounded-full font-medium text-[#5A5A40] bg-[#F5F5F0] hover:bg-black/5 transition-colors"
                   >
                     {t('cancel')}
                   </button>
                   <button 
                     type="submit"
-                    className="flex-1 bg-blue-700 text-white py-4 rounded-full font-bold hover:bg-blue-800 transition-colors"
+                    className="flex-1 bg-[#5A5A40] text-white py-4 rounded-full font-medium hover:bg-[#4A4A30] transition-colors"
                   >
                     {t('tx.save')}
                   </button>
@@ -1041,17 +1481,17 @@ function Dashboard() {
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-md bg-white rounded-2xl p-8 shadow-2xl"
+              className="relative w-full max-w-md bg-white rounded-[32px] p-8 shadow-2xl"
             >
-              <h3 className="text-2xl font-sans font-bold mb-6">{t('pdf.generate')}</h3>
+              <h3 className="text-2xl font-serif mb-6">{t('pdf.generate')}</h3>
               
               <div className="space-y-6">
-                <div className="flex gap-2 p-1 bg-gray-50 rounded-xl border border-gray-200">
+                <div className="flex gap-2 p-1 bg-[#F5F5F0] rounded-2xl">
                   <button 
                     onClick={() => setExportType('monthly')}
                     className={cn(
-                      "flex-1 py-3 rounded-lg text-xs font-bold uppercase tracking-widest transition-all",
-                      exportType === 'monthly' ? "bg-blue-700 text-white shadow-sm" : "text-blue-700/40"
+                      "flex-1 py-3 rounded-xl text-xs font-bold uppercase tracking-widest transition-all",
+                      exportType === 'monthly' ? "bg-[#5A5A40] text-white shadow-sm" : "text-[#5A5A40]/40"
                     )}
                   >
                     {t('pdf.monthly')}
@@ -1059,8 +1499,8 @@ function Dashboard() {
                   <button 
                     onClick={() => setExportType('yearly')}
                     className={cn(
-                      "flex-1 py-3 rounded-lg text-xs font-bold uppercase tracking-widest transition-all",
-                      exportType === 'yearly' ? "bg-blue-700 text-white shadow-sm" : "text-blue-700/40"
+                      "flex-1 py-3 rounded-xl text-xs font-bold uppercase tracking-widest transition-all",
+                      exportType === 'yearly' ? "bg-[#5A5A40] text-white shadow-sm" : "text-[#5A5A40]/40"
                     )}
                   >
                     {t('pdf.yearly')}
@@ -1069,22 +1509,22 @@ function Dashboard() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs uppercase tracking-widest text-blue-700 mb-2 font-bold">{t('pdf.year')}</label>
+                    <label className="block text-xs uppercase tracking-widest text-[#5A5A40] mb-2 font-medium">{t('pdf.year')}</label>
                     <select 
                       value={exportYear}
                       onChange={(e) => setExportYear(Number(e.target.value))}
-                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none appearance-none font-bold"
+                      className="w-full px-4 py-3 bg-[#F5F5F0] border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40]/20 outline-none appearance-none font-medium"
                     >
                       {years.map(y => <option key={y} value={y}>{y}</option>)}
                     </select>
                   </div>
                   {exportType === 'monthly' && (
                     <div>
-                      <label className="block text-xs uppercase tracking-widest text-blue-700 mb-2 font-bold">{t('pdf.month')}</label>
+                      <label className="block text-xs uppercase tracking-widest text-[#5A5A40] mb-2 font-medium">{t('pdf.month')}</label>
                       <select 
                         value={exportMonth}
                         onChange={(e) => setExportMonth(Number(e.target.value))}
-                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none appearance-none font-bold"
+                        className="w-full px-4 py-3 bg-[#F5F5F0] border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40]/20 outline-none appearance-none font-medium"
                       >
                         {Array.from({ length: 12 }).map((_, i) => (
                           <option key={i} value={i}>{format(new Date(2024, i), 'MMMM')}</option>
@@ -1097,18 +1537,60 @@ function Dashboard() {
                 <div className="flex gap-4 pt-4">
                   <button 
                     onClick={() => setIsExportModalOpen(false)}
-                    className="flex-1 py-4 rounded-full font-bold text-blue-700 bg-gray-50 hover:bg-gray-100 transition-colors"
+                    className="flex-1 py-4 rounded-full font-medium text-[#5A5A40] bg-[#F5F5F0] hover:bg-black/5 transition-colors"
                   >
                     {t('cancel')}
                   </button>
                   <button 
                     onClick={() => exportToPDF(exportType, exportYear, exportMonth)}
-                    className="flex-1 bg-blue-700 text-white py-4 rounded-full font-bold hover:bg-blue-800 transition-colors flex items-center justify-center gap-2"
+                    className="flex-1 bg-[#5A5A40] text-white py-4 rounded-full font-medium hover:bg-[#4A4A30] transition-colors flex items-center justify-center gap-2"
                   >
                     <Download className="w-4 h-4" />
                     {t('pdf.download')}
                   </button>
                 </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Notice Confirmation Modal */}
+      <AnimatePresence>
+        {deletingNoticeId && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setDeletingNoticeId(null)}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-sm bg-white rounded-[32px] p-8 shadow-2xl text-center"
+            >
+              <div className="w-16 h-16 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Trash2 className="w-8 h-8" />
+              </div>
+              <h3 className="text-2xl font-serif mb-2">{t('del.title')}</h3>
+              <p className="text-[#5A5A40]/60 mb-8">Are you sure you want to delete this notice? This action cannot be undone.</p>
+              
+              <div className="flex gap-4">
+                <button 
+                  onClick={() => setDeletingNoticeId(null)}
+                  className="flex-1 py-3 rounded-full font-medium text-[#5A5A40] bg-[#F5F5F0] hover:bg-black/5 transition-colors"
+                >
+                  {t('cancel')}
+                </button>
+                <button 
+                  onClick={() => confirmDeleteNotice(deletingNoticeId)}
+                  className="flex-1 bg-rose-600 text-white py-3 rounded-full font-medium hover:bg-rose-700 transition-colors"
+                >
+                  {t('del.confirm')}
+                </button>
               </div>
             </motion.div>
           </div>
@@ -1130,25 +1612,25 @@ function Dashboard() {
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-sm bg-white rounded-2xl p-8 shadow-2xl text-center"
+              className="relative w-full max-w-sm bg-white rounded-[32px] p-8 shadow-2xl text-center"
             >
               <div className="w-16 h-16 bg-rose-50 rounded-full flex items-center justify-center mx-auto mb-4">
                 <AlertCircle className="text-rose-600 w-8 h-8" />
               </div>
-              <h3 className="text-xl font-sans font-bold mb-2">{t('del.title')}</h3>
-              <p className="text-sm text-gray-500 mb-8">
+              <h3 className="text-xl font-serif mb-2">{t('del.title')}</h3>
+              <p className="text-sm text-[#5A5A40]/60 mb-8">
                 {t('del.desc')}
               </p>
               <div className="flex gap-4">
                 <button 
                   onClick={() => setDeletingId(null)}
-                  className="flex-1 py-3 rounded-full font-bold text-blue-700 bg-gray-50 hover:bg-gray-100 transition-colors"
+                  className="flex-1 py-3 rounded-full font-medium text-[#5A5A40] bg-[#F5F5F0] hover:bg-black/5 transition-colors"
                 >
                   {t('cancel')}
                 </button>
                 <button 
                   onClick={() => handleDelete(deletingId)}
-                  className="flex-1 bg-rose-600 text-white py-3 rounded-full font-bold hover:bg-rose-700 transition-colors"
+                  className="flex-1 bg-rose-600 text-white py-3 rounded-full font-medium hover:bg-rose-700 transition-colors"
                 >
                   {t('del.confirm')}
                 </button>
@@ -1157,20 +1639,243 @@ function Dashboard() {
           </div>
         )}
       </AnimatePresence>
+      
+      {/* Add/Edit Notice Modal */}
+      <AnimatePresence>
+        {isAddingNotice && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                setIsAddingNotice(false);
+                setEditingNotice(null);
+              }}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-md bg-white rounded-[32px] p-8 shadow-2xl"
+            >
+              <h3 className="text-2xl font-serif mb-6">{editingNotice ? 'Edit Notice' : 'Add Notice'}</h3>
+              
+              {noticeError && (
+                <div className="mb-6 p-4 bg-rose-50 text-rose-600 rounded-2xl text-sm font-medium">
+                  {noticeError}
+                </div>
+              )}
+
+              <form onSubmit={addNotice} className="space-y-6">
+                <div>
+                  <label className="block text-xs uppercase tracking-widest text-[#5A5A40] mb-2 font-medium">Title</label>
+                  <input 
+                    name="title"
+                    type="text"
+                    required
+                    defaultValue={editingNotice?.title || ''}
+                    placeholder="Notice Title"
+                    className="w-full px-6 py-4 bg-[#F5F5F0] border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40]/20 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs uppercase tracking-widest text-[#5A5A40] mb-2 font-medium">Content</label>
+                  <textarea 
+                    name="content"
+                    required
+                    rows={4}
+                    defaultValue={editingNotice?.content || ''}
+                    placeholder="Notice Content"
+                    className="w-full px-6 py-4 bg-[#F5F5F0] border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40]/20 outline-none resize-none"
+                  />
+                </div>
+
+                <div className="flex gap-4 pt-4">
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      setIsAddingNotice(false);
+                      setEditingNotice(null);
+                    }}
+                    className="flex-1 py-4 rounded-full font-medium text-[#5A5A40] bg-[#F5F5F0] hover:bg-black/5 transition-colors"
+                  >
+                    {t('cancel')}
+                  </button>
+                  <button 
+                    type="submit"
+                    className="flex-1 bg-[#5A5A40] text-white py-4 rounded-full font-medium hover:bg-[#4A4A30] transition-colors"
+                  >
+                    {editingNotice ? 'Update Notice' : 'Post Notice'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Transaction Details Modal */}
+      <AnimatePresence>
+        {selectedTransactionForDetails && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedTransactionForDetails(null)}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-md bg-white rounded-[32px] p-8 shadow-2xl"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <div className={cn(
+                  "w-12 h-12 rounded-xl flex items-center justify-center",
+                  selectedTransactionForDetails.type === 'income' ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
+                )}>
+                  {selectedTransactionForDetails.type === 'income' ? <TrendingUp className="w-6 h-6" /> : <TrendingDown className="w-6 h-6" />}
+                </div>
+                <button 
+                  onClick={() => setSelectedTransactionForDetails(null)}
+                  className="p-2 hover:bg-black/5 rounded-full transition-colors"
+                >
+                  <X className="w-6 h-6 text-[#5A5A40]" />
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-3xl font-serif text-[#1A1A1A]">
+                    {selectedTransactionForDetails.type === 'income' ? '+' : '-'} ₹{selectedTransactionForDetails.amount.toLocaleString()}
+                  </h3>
+                  <p className="text-[#5A5A40]/60 font-medium uppercase tracking-widest text-[10px] mt-1">
+                    {selectedTransactionForDetails.category}
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="p-6 bg-[#F5F5F0] rounded-2xl">
+                    <label className="block text-[10px] uppercase tracking-widest text-[#5A5A40]/40 mb-2 font-bold">Description</label>
+                    <p className="text-[#1A1A1A] leading-relaxed">
+                      {selectedTransactionForDetails.description || 'No description provided.'}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-4 bg-[#F5F5F0] rounded-2xl">
+                      <label className="block text-[10px] uppercase tracking-widest text-[#5A5A40]/40 mb-1 font-bold">Date</label>
+                      <p className="text-sm font-medium">
+                        {selectedTransactionForDetails.date ? format(selectedTransactionForDetails.date.toDate(), 'MMM d, yyyy') : 'N/A'}
+                      </p>
+                    </div>
+                    <div className="p-4 bg-[#F5F5F0] rounded-2xl">
+                      <label className="block text-[10px] uppercase tracking-widest text-[#5A5A40]/40 mb-1 font-bold">Recorded By</label>
+                      <p className="text-sm font-medium">{selectedTransactionForDetails.createdBy}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-4 pt-4">
+                  <button 
+                    onClick={() => {
+                      setSelectedTransactionForComments(selectedTransactionForDetails);
+                      setSelectedTransactionForDetails(null);
+                    }}
+                    className="flex-1 flex items-center justify-center gap-2 bg-[#5A5A40] text-white py-4 rounded-full font-medium hover:bg-[#4A4A30] transition-colors"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-message-circle"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>
+                    View Comments
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Comments Modal */}
+      <AnimatePresence>
+        {selectedTransactionForComments && flatInfo && (
+          <CommentsModal
+            transactionId={selectedTransactionForComments.id}
+            transactionTitle={selectedTransactionForComments.description || selectedTransactionForComments.category}
+            currentUserFlatNo={flatInfo.flatNo}
+            currentUserRole={flatInfo.role}
+            onClose={() => setSelectedTransactionForComments(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
+interface ErrorBoundaryProps {
+  children: React.ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: any;
+}
+
+class ErrorBoundary extends (Component as any) {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: any): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: any, errorInfo: any) {
+    console.error("ErrorBoundary caught an error", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-[#F5F5F0] p-4 text-black">
+          <div className="bg-white p-8 rounded-[32px] shadow-xl max-w-md w-full text-center">
+            <h2 className="text-2xl font-serif mb-4">Something went wrong</h2>
+            <p className="text-gray-600 mb-6">
+              {this.state.error?.message?.startsWith('{') 
+                ? "A database error occurred. The developers have been notified."
+                : "An unexpected error occurred. Please try refreshing the page."}
+            </p>
+            <button 
+              onClick={() => window.location.reload()}
+              className="w-full py-4 bg-black text-white rounded-2xl font-medium hover:bg-zinc-800 transition-all"
+            >
+              Refresh Page
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return (this.props as any).children;
+  }
+}
+
 export default function App() {
   return (
-    <LanguageProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/adminpanel" element={<AdminPanel />} />
-        </Routes>
-        <InstallPWA />
-      </BrowserRouter>
-    </LanguageProvider>
+    <ErrorBoundary>
+      <LanguageProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/adminpanel" element={<AdminPanel />} />
+            <Route path="/profile" element={<Profile />} />
+          </Routes>
+        </BrowserRouter>
+      </LanguageProvider>
+    </ErrorBoundary>
   );
 }
