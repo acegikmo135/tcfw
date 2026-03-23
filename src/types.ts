@@ -8,6 +8,7 @@ export interface Transaction {
   status: 'completed' | 'pending';
   description?: string;
   createdBy?: string;
+  creatorUid: string;
 }
 
 export interface Notice {
@@ -17,6 +18,24 @@ export interface Notice {
   type: 'info' | 'warning' | 'success';
   date: string;
   author: string;
+  authorUid: string;
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  type: 'income' | 'expense';
+  icon?: string;
+}
+
+export interface Comment {
+  id: string;
+  targetId: string; // ID of the notice or transaction
+  targetType: 'notice' | 'transaction';
+  content: string;
+  author: string;
+  authorUid: string;
+  date: string;
 }
 
 export interface UserProfile {

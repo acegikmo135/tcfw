@@ -112,6 +112,25 @@ service cloud.firestore {
              data.creatorUid is string && data.creatorUid == request.auth.uid;
     }
 
+    function isValidComment(data) {
+      return hasRequiredFields(['targetId', 'targetType', 'content', 'author', 'authorUid', 'date']) &&
+             hasOnlyAllowedFields(['targetId', 'targetType', 'content', 'author', 'authorUid', 'date']) &&
+             data.targetId is string && data.targetId.size() > 0 &&
+             data.targetType in ['notice', 'transaction'] &&
+             data.content is string && data.content.size() > 0 && data.content.size() < 1000 &&
+             data.author is string && data.author.size() > 0 &&
+             data.authorUid is string && data.authorUid == request.auth.uid &&
+             data.date is string;
+    }
+
+    function isValidCategory(data) {
+      return hasRequiredFields(['name', 'type']) &&
+             hasOnlyAllowedFields(['name', 'type', 'icon']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 50 &&
+             data.type in ['income', 'expense'] &&
+             (!('icon' in data) || data.icon is string);
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
@@ -134,6 +153,20 @@ service cloud.firestore {
       allow create: if isAdmin() && isValidTransaction(request.resource.data);
       allow update: if isAdmin() && isValidTransaction(request.resource.data);
       allow delete: if isAdmin();
+    }
+
+    match /categories/{categoryId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() && isValidCategory(request.resource.data);
+      allow update: if isAdmin() && isValidCategory(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /comments/{commentId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidComment(request.resource.data);
+      allow update: if isAuthenticated() && isOwner(resource.data.authorUid) && isValidComment(request.resource.data);
+      allow delete: if isAuthenticated() && (isOwner(resource.data.authorUid) || isAdmin());
     }
   }
 }

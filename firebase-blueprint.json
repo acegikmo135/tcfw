@@ -43,6 +43,31 @@
         "creatorUid": { "type": "string", "description": "UID of the creator." }
       },
       "required": ["title", "amount", "type", "category", "date", "status", "creatorUid"]
+    },
+    "Category": {
+      "title": "Transaction Category",
+      "description": "Stores categories for transactions.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Name of the category." },
+        "type": { "type": "string", "enum": ["income", "expense"], "description": "Type of category." },
+        "icon": { "type": "string", "description": "Icon name from lucide-react." }
+      },
+      "required": ["name", "type"]
+    },
+    "Comment": {
+      "title": "Comment",
+      "description": "Stores comments on notices or transactions.",
+      "type": "object",
+      "properties": {
+        "targetId": { "type": "string", "description": "ID of the notice or transaction." },
+        "targetType": { "type": "string", "enum": ["notice", "transaction"], "description": "Type of the target." },
+        "content": { "type": "string", "description": "Content of the comment." },
+        "author": { "type": "string", "description": "Name of the author." },
+        "authorUid": { "type": "string", "description": "UID of the author." },
+        "date": { "type": "string", "format": "date-time", "description": "Date of the comment." }
+      },
+      "required": ["targetId", "targetType", "content", "author", "authorUid", "date"]
     }
   },
   "firestore": {
@@ -57,6 +82,14 @@
     "/transactions/{transactionId}": {
       "schema": "Transaction",
       "description": "Financial transactions."
+    },
+    "/categories/{categoryId}": {
+      "schema": "Category",
+      "description": "Transaction categories."
+    },
+    "/comments/{commentId}": {
+      "schema": "Comment",
+      "description": "Comments on notices or transactions."
     }
   }
 }
