@@ -1,9 +1,5 @@
 {
   "name": "The Courtyard F wing",
   "description": "A transparent expense and fund tracker for building residents with admin-only write access.",
-  "requestFramePermissions": [
-    "publickey-credentials-create",
-    "publickey-credentials-get",
-    "webauthn"
-  ]
+  "requestFramePermissions": []
 }

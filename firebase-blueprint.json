@@ -1,95 +1,39 @@
 {
   "entities": {
-    "UserProfile": {
-      "title": "User Profile",
-      "description": "Stores user profile and role information.",
+    "Flat": {
+      "title": "Flat",
+      "description": "A building unit with login credentials and role.",
       "type": "object",
       "properties": {
-        "uid": { "type": "string", "description": "Unique user ID from Firebase Auth." },
-        "email": { "type": "string", "format": "email", "description": "User's email address." },
-        "displayName": { "type": "string", "description": "User's display name." },
-        "role": { "type": "string", "enum": ["admin", "resident"], "description": "User's role in the building." },
-        "photoURL": { "type": "string", "format": "uri", "description": "User's profile picture URL." }
+        "flatNo": { "type": "string", "description": "The flat number (e.g., F601)." },
+        "password": { "type": "string", "description": "The password for login." },
+        "role": { "type": "string", "enum": ["admin", "resident"], "description": "The role of the flat." }
       },
-      "required": ["uid", "email", "displayName", "role"]
-    },
-    "Notice": {
-      "title": "Building Notice",
-      "description": "Stores notices posted by admins for residents.",
-      "type": "object",
-      "properties": {
-        "title": { "type": "string", "description": "Title of the notice." },
-        "content": { "type": "string", "description": "Full content of the notice." },
-        "type": { "type": "string", "enum": ["info", "warning", "success"], "description": "Type of notice." },
-        "date": { "type": "string", "format": "date-time", "description": "Date and time the notice was posted." },
-        "author": { "type": "string", "description": "Name of the person who posted the notice." },
-        "authorUid": { "type": "string", "description": "UID of the author." }
-      },
-      "required": ["title", "content", "type", "date", "author", "authorUid"]
+      "required": ["flatNo", "password", "role"]
     },
     "Transaction": {
-      "title": "Expense/Income Transaction",
-      "description": "Stores financial transactions for the building.",
+      "title": "Transaction",
+      "description": "An income or expense entry for the building fund.",
       "type": "object",
       "properties": {
-        "title": { "type": "string", "description": "Title of the transaction." },
-        "amount": { "type": "number", "description": "Amount of the transaction." },
         "type": { "type": "string", "enum": ["income", "expense"], "description": "Type of transaction." },
-        "category": { "type": "string", "description": "Category (e.g., Maintenance, Utilities)." },
-        "date": { "type": "string", "format": "date-time", "description": "Date of the transaction." },
-        "status": { "type": "string", "enum": ["completed", "pending"], "description": "Status of the transaction." },
+        "amount": { "type": "number", "description": "Amount in currency." },
+        "category": { "type": "string", "description": "Category (e.g., Plumbing, Wiring)." },
         "description": { "type": "string", "description": "Detailed description." },
-        "createdBy": { "type": "string", "description": "Name of the person who created the entry." },
-        "creatorUid": { "type": "string", "description": "UID of the creator." }
+        "date": { "type": "string", "format": "date-time", "description": "When the transaction occurred." },
+        "createdBy": { "type": "string", "description": "The flat ID that created this entry." }
       },
-      "required": ["title", "amount", "type", "category", "date", "status", "creatorUid"]
-    },
-    "Category": {
-      "title": "Transaction Category",
-      "description": "Stores categories for transactions.",
-      "type": "object",
-      "properties": {
-        "name": { "type": "string", "description": "Name of the category." },
-        "type": { "type": "string", "enum": ["income", "expense"], "description": "Type of category." },
-        "icon": { "type": "string", "description": "Icon name from lucide-react." }
-      },
-      "required": ["name", "type"]
-    },
-    "Comment": {
-      "title": "Comment",
-      "description": "Stores comments on notices or transactions.",
-      "type": "object",
-      "properties": {
-        "targetId": { "type": "string", "description": "ID of the notice or transaction." },
-        "targetType": { "type": "string", "enum": ["notice", "transaction"], "description": "Type of the target." },
-        "content": { "type": "string", "description": "Content of the comment." },
-        "author": { "type": "string", "description": "Name of the author." },
-        "authorUid": { "type": "string", "description": "UID of the author." },
-        "date": { "type": "string", "format": "date-time", "description": "Date of the comment." }
-      },
-      "required": ["targetId", "targetType", "content", "author", "authorUid", "date"]
+      "required": ["type", "amount", "category", "date", "createdBy"]
     }
   },
   "firestore": {
-    "/users/{uid}": {
-      "schema": "UserProfile",
-      "description": "User profile documents."
-    },
-    "/notices/{noticeId}": {
-      "schema": "Notice",
-      "description": "Building notices."
+    "/flats/{flatId}": {
+      "schema": "Flat",
+      "description": "Collection of building flats and their credentials."
     },
     "/transactions/{transactionId}": {
       "schema": "Transaction",
-      "description": "Financial transactions."
-    },
-    "/categories/{categoryId}": {
-      "schema": "Category",
-      "description": "Transaction categories."
-    },
-    "/comments/{commentId}": {
-      "schema": "Comment",
-      "description": "Comments on notices or transactions."
+      "description": "Collection of all financial transactions."
     }
   }
 }

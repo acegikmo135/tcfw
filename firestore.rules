@@ -5,168 +5,65 @@ service cloud.firestore {
     // Assumed Data Model
     // ===============================================================
     //
-    // Collection: users
-    // Document ID: {uid}
+    // Collection: flats
+    // Document ID: {flatId} (e.g., F601)
     // Fields:
-    //   - uid: string (required) - Unique user ID from Firebase Auth.
-    //   - email: string (required, email format) - User's email address.
-    //   - displayName: string (required) - User's display name.
-    //   - role: string (required, enum: ['admin', 'resident']) - User's role.
-    //   - photoURL: string (optional, uri format) - User's profile picture URL.
-    //
-    // Collection: notices
-    // Document ID: {noticeId}
-    // Fields:
-    //   - title: string (required) - Title of the notice.
-    //   - content: string (required) - Full content of the notice.
-    //   - type: string (required, enum: ['info', 'warning', 'success']) - Type of notice.
-    //   - date: string (required, date-time format) - Date and time the notice was posted.
-    //   - author: string (required) - Name of the person who posted the notice.
-    //   - authorUid: string (required) - UID of the author.
+    //   - flatNo: string (required)
+    //   - role: string (required, 'admin' or 'resident')
     //
     // Collection: transactions
     // Document ID: {transactionId}
     // Fields:
-    //   - title: string (required) - Title of the transaction.
-    //   - amount: number (required) - Amount of the transaction.
-    //   - type: string (required, enum: ['income', 'expense']) - Type of transaction.
-    //   - category: string (required) - Category (e.g., Maintenance, Utilities).
-    //   - date: string (required, date-time format) - Date of the transaction.
-    //   - status: string (required, enum: ['completed', 'pending']) - Status of the transaction.
-    //   - description: string (optional) - Detailed description.
-    //   - createdBy: string (optional) - Name of the person who created the entry.
-    //   - creatorUid: string (required) - UID of the creator.
+    //   - type: string (required, 'income' or 'expense')
+    //   - amount: number (required, positive)
+    //   - category: string (required)
+    //   - description: string (optional)
+    //   - date: timestamp (required)
+    //   - createdBy: string (required, flatId)
     //
     // ===============================================================
 
-    // ===============================================================
     // Helper Functions
-    // ===============================================================
-    
     function isAuthenticated() {
       return request.auth != null;
     }
 
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
-    }
-
     function isAdmin() {
-      return isAuthenticated() &&
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-          (request.auth.token.email == "manthankansagra@gmail.com" && request.auth.token.email_verified == true));
+      return isAuthenticated() && 
+        (request.auth.token.email == "manthankansagra@gmail.com" || 
+         (exists(/databases/$(database)/documents/flats/$(request.auth.token.email.split('@')[0])) && 
+          get(/databases/$(database)/documents/flats/$(request.auth.token.email.split('@')[0])).data.role == 'admin'));
     }
 
-    function isValidEmail(email) {
-      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
-    }
-
-    function isValidUrl(url) {
-      return url is string && (url.matches("^https://.*") || url.matches("^http://.*"));
-    }
-
-    function hasRequiredFields(fields) {
-      return request.resource.data.keys().hasAll(fields);
-    }
-
-    function hasOnlyAllowedFields(fields) {
-      return request.resource.data.keys().hasOnly(fields);
-    }
-
-    // ===============================================================
-    // Domain Validators
-    // ===============================================================
-
-    function isValidUser(data) {
-      return hasRequiredFields(['uid', 'email', 'displayName', 'role']) &&
-             hasOnlyAllowedFields(['uid', 'email', 'displayName', 'role', 'photoURL']) &&
-             data.uid is string && data.uid.size() > 0 &&
-             data.email is string && isValidEmail(data.email) &&
-             data.displayName is string && data.displayName.size() > 0 && data.displayName.size() < 100 &&
-             data.role in ['admin', 'resident'] &&
-             (!('photoURL' in data) || isValidUrl(data.photoURL));
-    }
-
-    function isValidNotice(data) {
-      return hasRequiredFields(['title', 'content', 'type', 'date', 'author', 'authorUid']) &&
-             hasOnlyAllowedFields(['title', 'content', 'type', 'date', 'author', 'authorUid']) &&
-             data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
-             data.content is string && data.content.size() > 0 && data.content.size() < 5000 &&
-             data.type in ['info', 'warning', 'success'] &&
-             data.date is string &&
-             data.author is string && data.author.size() > 0 &&
-             data.authorUid is string && data.authorUid == request.auth.uid;
-    }
-
+    // Validation Functions
     function isValidTransaction(data) {
-      return hasRequiredFields(['title', 'amount', 'type', 'category', 'date', 'status', 'creatorUid']) &&
-             hasOnlyAllowedFields(['title', 'amount', 'type', 'category', 'date', 'status', 'description', 'createdBy', 'creatorUid']) &&
-             data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
-             data.amount is number && data.amount >= 0 &&
+      return data.keys().hasAll(['type', 'amount', 'category', 'date', 'createdBy']) &&
              data.type in ['income', 'expense'] &&
+             data.amount is number && data.amount > 0 &&
              data.category is string && data.category.size() > 0 &&
-             data.date is string &&
-             data.status in ['completed', 'pending'] &&
-             (!('description' in data) || (data.description is string && data.description.size() < 2000)) &&
-             (!('createdBy' in data) || (data.createdBy is string && data.createdBy.size() < 100)) &&
-             data.creatorUid is string && data.creatorUid == request.auth.uid;
+             data.date is timestamp &&
+             data.createdBy is string;
     }
 
-    function isValidComment(data) {
-      return hasRequiredFields(['targetId', 'targetType', 'content', 'author', 'authorUid', 'date']) &&
-             hasOnlyAllowedFields(['targetId', 'targetType', 'content', 'author', 'authorUid', 'date']) &&
-             data.targetId is string && data.targetId.size() > 0 &&
-             data.targetType in ['notice', 'transaction'] &&
-             data.content is string && data.content.size() > 0 && data.content.size() < 1000 &&
-             data.author is string && data.author.size() > 0 &&
-             data.authorUid is string && data.authorUid == request.auth.uid &&
-             data.date is string;
-    }
-
-    function isValidCategory(data) {
-      return hasRequiredFields(['name', 'type']) &&
-             hasOnlyAllowedFields(['name', 'type', 'icon']) &&
-             data.name is string && data.name.size() > 0 && data.name.size() < 50 &&
-             data.type in ['income', 'expense'] &&
-             (!('icon' in data) || data.icon is string);
-    }
-
-    // ===============================================================
-    // Rules
-    // ===============================================================
-
-    match /users/{userId} {
+    match /flats/{flatId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == 'resident' || isAdmin());
-      allow update: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == resource.data.role || isAdmin());
-    }
-
-    match /notices/{noticeId} {
-      allow read: if isAuthenticated();
-      allow create: if isAdmin() && isValidNotice(request.resource.data);
-      allow update: if isAdmin() && isValidNotice(request.resource.data);
-      allow delete: if isAdmin();
+      // Allow admins to manage all flats
+      // Allow initial setup for specific emails, but restrict role creation
+      allow create: if isAdmin() || 
+        (isAuthenticated() && 
+         (request.auth.token.email == flatId + "@building.local" || request.auth.token.email == "manthankansagra@gmail.com") &&
+         (request.resource.data.role == 'resident' || request.auth.token.email == 'f602@building.local' || request.auth.token.email == 'manthankansagra@gmail.com')
+        );
+      allow update, delete: if isAdmin();
     }
 
     match /transactions/{transactionId} {
+      // All residents can read transactions
       allow read: if isAuthenticated();
+      // Only admins can create/update/delete transactions
       allow create: if isAdmin() && isValidTransaction(request.resource.data);
       allow update: if isAdmin() && isValidTransaction(request.resource.data);
       allow delete: if isAdmin();
-    }
-
-    match /categories/{categoryId} {
-      allow read: if isAuthenticated();
-      allow create: if isAdmin() && isValidCategory(request.resource.data);
-      allow update: if isAdmin() && isValidCategory(request.resource.data);
-      allow delete: if isAdmin();
-    }
-
-    match /comments/{commentId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && isValidComment(request.resource.data);
-      allow update: if isAuthenticated() && isOwner(resource.data.authorUid) && isValidComment(request.resource.data);
-      allow delete: if isAuthenticated() && (isOwner(resource.data.authorUid) || isAdmin());
     }
   }
 }
