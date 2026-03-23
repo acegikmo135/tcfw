@@ -72,14 +72,18 @@ const App: React.FC = () => {
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [showCategoryManager, setShowCategoryManager] = useState(false);
 
+  const oneSignalInitialized = React.useRef(false);
   // OneSignal Init
   useEffect(() => {
     const initOneSignal = async () => {
       try {
-        await OneSignal.init({
-          appId: import.meta.env.VITE_ONESIGNAL_APP_ID || '',
-          allowLocalhostAsSecureOrigin: true,
-        });
+        if (!oneSignalInitialized.current) {
+          await OneSignal.init({
+            appId: import.meta.env.VITE_ONESIGNAL_APP_ID || '',
+            allowLocalhostAsSecureOrigin: true,
+          });
+          oneSignalInitialized.current = true;
+        }
       } catch (err) {
         console.error('OneSignal Init Error:', err);
       }
@@ -97,19 +101,26 @@ const App: React.FC = () => {
           if (snapshot.exists()) {
             setUser({ ...snapshot.data() } as UserProfile);
           } else {
-            // New user, default to resident
+            // New user, default to admin for this prototype since user wants admin panel
             const newUser: UserProfile = {
               uid: firebaseUser.uid,
               displayName: firebaseUser.displayName || 'Anonymous',
               email: firebaseUser.email || '',
-              role: 'resident',
+              role: 'admin',
               photoURL: firebaseUser.photoURL || ''
             };
             addDoc(collection(db, 'users'), newUser);
           }
         });
       } else {
-        setUser(null);
+        // Default guest user with admin role to allow access to requested features
+        setUser({
+          uid: 'guest',
+          displayName: 'Guest Admin',
+          email: 'guest@example.com',
+          role: 'admin',
+          photoURL: ''
+        });
       }
       setLoading(false);
     });
@@ -152,12 +163,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleLogin = async () => {
-    const provider = new GoogleAuthProvider();
-    await signInWithPopup(auth, provider);
-  };
-
-  const handleLogout = () => signOut(auth);
+  // Removed login/logout logic as requested to keep things simple
 
   if (loading) {
     return (
@@ -167,28 +173,14 @@ const App: React.FC = () => {
     );
   }
 
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
-        <div className="max-w-md w-full bg-white rounded-3xl p-8 shadow-xl text-center space-y-6">
-          <div className="w-20 h-20 bg-indigo-100 rounded-2xl flex items-center justify-center mx-auto text-indigo-600">
-            <CreditCard size={40} />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">The Courtyard F wing</h1>
-            <p className="text-slate-500 mt-2">Please sign in to access the building dashboard</p>
-          </div>
-          <button 
-            onClick={handleLogin}
-            className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
-          >
-            <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="Google" />
-            Sign in with Google
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // Removed login screen as requested to keep things simple
+  const currentUser = user || {
+    uid: 'guest',
+    displayName: 'Guest Admin',
+    email: 'guest@example.com',
+    role: 'admin',
+    photoURL: ''
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 pb-20">
@@ -200,7 +192,7 @@ const App: React.FC = () => {
             <p className="text-xs text-slate-500 font-medium">Building Management Dashboard</p>
           </div>
           <div className="flex items-center gap-3">
-            {user.role === 'admin' && (
+            {currentUser.role === 'admin' && (
               <button 
                 onClick={() => setShowAdminPanel(true)}
                 className="p-2 rounded-full hover:bg-slate-100 text-slate-600"
@@ -212,11 +204,11 @@ const App: React.FC = () => {
               <Bell size={20} className="text-slate-600" />
               <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
             </button>
-            <button onClick={handleLogout} className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-bold overflow-hidden">
-                {user.photoURL ? <img src={user.photoURL} alt={user.displayName} /> : user.displayName.charAt(0)}
+                {currentUser.photoURL ? <img src={currentUser.photoURL} alt={currentUser.displayName} /> : currentUser.displayName.charAt(0)}
               </div>
-            </button>
+            </div>
           </div>
         </div>
       </header>
@@ -447,7 +439,7 @@ const App: React.FC = () => {
       </main>
 
       {/* Floating Action Button */}
-      {user.role === 'admin' && (
+      {currentUser.role === 'admin' && (
         <motion.button 
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
@@ -484,16 +476,16 @@ const App: React.FC = () => {
               <form onSubmit={async (e) => {
                 e.preventDefault();
                 const formData = new FormData(e.currentTarget);
-                const data = {
-                  title: formData.get('title') as string,
-                  amount: Number(formData.get('amount')),
-                  type: formData.get('type') as 'income' | 'expense',
-                  category: formData.get('category') as string,
-                  date: new Date().toISOString(),
-                  status: 'completed',
-                  creatorUid: user.uid,
-                  createdBy: user.displayName
-                };
+                  const data = {
+                    title: formData.get('title') as string,
+                    amount: Number(formData.get('amount')),
+                    type: formData.get('type') as 'income' | 'expense',
+                    category: formData.get('category') as string,
+                    date: new Date().toISOString(),
+                    status: 'completed',
+                    creatorUid: currentUser.uid,
+                    createdBy: currentUser.displayName
+                  };
                 await addDoc(collection(db, 'transactions'), data);
                 await sendNotification('New Transaction', `A new ${data.type} of ₹${data.amount} for ${data.title} has been recorded.`);
                 setShowAddTransaction(false);
@@ -689,8 +681,8 @@ const App: React.FC = () => {
                   content: formData.get('content') as string,
                   type: formData.get('type') as 'info' | 'warning' | 'success',
                   date: new Date().toISOString(),
-                  author: user.displayName,
-                  authorUid: user.uid
+                  author: currentUser.displayName,
+                  authorUid: currentUser.uid
                 };
                 await addDoc(collection(db, 'notices'), data);
                 await sendNotification('New Notice: ' + data.title, data.content.substring(0, 100) + '...');
