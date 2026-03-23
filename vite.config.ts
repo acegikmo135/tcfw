@@ -20,7 +20,7 @@ export default defineConfig(({mode}) => {
           name: 'Courtyard F Admin',
           short_name: 'Courtyard F Admin',
           description: 'Transparent Fund Management',
-          theme_color: '#5A5A40',
+          theme_color: '#1d4ed8',
           background_color: '#F5F5F0',
           display: 'standalone',
           start_url: '/adminpanel',

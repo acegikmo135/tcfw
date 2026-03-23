@@ -415,48 +415,48 @@ function Dashboard() {
     }
   }, [transactions, chartView, timeRange, selectedYear, selectedMonth]);
 
-  const COLORS = ['#5A5A40', '#8E8E6B', '#C2C296', '#E6E6D1', '#A3A375', '#70704F'];
+  const COLORS = ['#1d4ed8', '#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe', '#dbeafe'];
 
   if (!user && !loading) {
     return (
-      <div className="min-h-screen bg-[#F5F5F0] flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-md bg-white rounded-[32px] p-8 shadow-sm border border-black/5"
+          className="w-full max-w-md bg-white rounded-2xl p-8 shadow-xl border border-black/5"
         >
           <div className="flex flex-col items-center mb-8">
-            <div className="w-16 h-16 bg-[#5A5A40] rounded-full flex items-center justify-center mb-4 overflow-hidden">
+            <div className="w-16 h-16 bg-blue-700 rounded-full flex items-center justify-center mb-4 overflow-hidden">
               <img src="https://raw.githubusercontent.com/acegikmo135/assets/main/vbub4efh.jpg" alt="Logo" className="w-full h-full object-cover" />
             </div>
-            <h1 className="text-3xl font-serif text-[#1A1A1A]">{t('app.title')}</h1>
-            <p className="text-[#5A5A40]/60 font-serif italic text-center">{t('app.subtitle')}</p>
+            <h1 className="text-3xl font-sans font-bold text-gray-900">{t('app.title')}</h1>
+            <p className="text-blue-700/60 font-sans italic text-center">{t('app.subtitle')}</p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-6">
             <div>
-              <label className="block text-xs uppercase tracking-widest text-[#5A5A40] mb-2 font-medium">{t('login.flatNo')}</label>
+              <label className="block text-xs uppercase tracking-widest text-blue-700 mb-2 font-bold">{t('login.flatNo')}</label>
               <div className="relative">
-                <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#5A5A40]/40" />
+                <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-700/40" />
                 <input 
                   name="flatNo"
                   required
                   placeholder={t('login.flatNoPlaceholder')}
-                  className="w-full pl-12 pr-4 py-3 bg-[#F5F5F0] border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40]/20 outline-none transition-all"
+                  className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs uppercase tracking-widest text-[#5A5A40] mb-2 font-medium">{t('login.password')}</label>
+              <label className="block text-xs uppercase tracking-widest text-blue-700 mb-2 font-bold">{t('login.password')}</label>
               <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#5A5A40]/40" />
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-700/40" />
                 <input 
                   name="password"
                   type="password"
                   required
                   placeholder={t('login.passwordPlaceholder')}
-                  className="w-full pl-12 pr-4 py-3 bg-[#F5F5F0] border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40]/20 outline-none transition-all"
+                  className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
                 />
               </div>
             </div>
@@ -470,33 +470,33 @@ function Dashboard() {
 
             <button 
               type="submit"
-              className="w-full bg-[#5A5A40] text-white py-4 rounded-full font-medium hover:bg-[#4A4A30] transition-colors shadow-lg shadow-[#5A5A40]/20"
+              className="w-full bg-blue-700 text-white py-4 rounded-full font-bold hover:bg-blue-800 transition-colors shadow-lg shadow-blue-700/20"
             >
               {t('login.enter')}
             </button>
           </form>
 
           <div className="mt-8 pt-6 border-t border-black/5 text-center space-y-4">
-            <p className="text-xs text-[#5A5A40]/40 uppercase tracking-tighter">
+            <p className="text-xs text-blue-700/40 uppercase tracking-tighter">
               {t('login.authorized')}
             </p>
             <div className="pt-4 space-y-3">
-              <p className="text-sm font-serif text-[#5A5A40]">Made by Manthan - F602</p>
+              <p className="text-sm font-sans font-semibold text-blue-700">Made by Manthan - F602</p>
               <div className="flex flex-col items-center gap-2">
                 <a 
                   href="https://manthank.com" 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  className="text-xs font-bold uppercase tracking-widest text-white bg-[#5A5A40] px-4 py-2 rounded-full hover:bg-[#4A4A30] transition-colors"
+                  className="text-xs font-bold uppercase tracking-widest text-white bg-blue-700 px-4 py-2 rounded-full hover:bg-blue-800 transition-colors"
                 >
                   Visit Website
                 </a>
-                <p className="text-xs text-[#5A5A40]/60 mt-2">If any issue, contact dev@manthank.com</p>
+                <p className="text-xs text-blue-700/60 mt-2">If any issue, contact dev@manthank.com</p>
                 <a 
                   href="https://mail.google.com/mail/?view=cm&fs=1&to=dev@manthank.com" 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  className="text-xs font-bold uppercase tracking-widest text-[#5A5A40] border border-[#5A5A40]/20 px-4 py-2 rounded-full hover:bg-[#F5F5F0] transition-colors"
+                  className="text-xs font-bold uppercase tracking-widest text-blue-700 border border-blue-700/20 px-4 py-2 rounded-full hover:bg-gray-50 transition-colors"
                 >
                   Email Support
                 </a>
@@ -509,17 +509,17 @@ function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F5F5F0] text-[#1A1A1A] font-sans">
+    <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
       {/* Header */}
       <header className="bg-white border-b border-black/5 sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-4 h-20 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-[#5A5A40] rounded-xl flex items-center justify-center overflow-hidden">
+            <div className="w-10 h-10 bg-blue-700 rounded-xl flex items-center justify-center overflow-hidden">
               <img src="https://raw.githubusercontent.com/acegikmo135/assets/main/vbub4efh.jpg" alt="Logo" className="w-full h-full object-cover" />
             </div>
             <div>
-              <h2 className="font-serif text-lg leading-tight">{t('app.title')}</h2>
-              <p className="text-xs text-[#5A5A40]/60 font-medium uppercase tracking-widest">
+              <h2 className="font-sans font-bold text-lg leading-tight">{t('app.title')}</h2>
+              <p className="text-xs text-blue-700/60 font-bold uppercase tracking-widest">
                 {t('login.flatNo')} {flatInfo?.flatNo} • {flatInfo?.role === 'admin' ? t('admin.admin') : t('admin.resident')}
               </p>
             </div>
@@ -527,14 +527,14 @@ function Dashboard() {
           <div className="flex items-center gap-4">
             <button
               onClick={() => setLanguage(language === 'en' ? 'gu' : 'en')}
-              className="text-xs font-bold uppercase tracking-widest text-[#5A5A40]/60 hover:text-[#5A5A40] transition-colors"
+              className="text-xs font-bold uppercase tracking-widest text-blue-700/60 hover:text-blue-700 transition-colors"
             >
               {language === 'en' ? 'GU' : 'EN'}
             </button>
             {flatInfo?.role === 'admin' && (
               <Link 
                 to="/adminpanel" 
-                className="hidden sm:flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[#5A5A40]/40 hover:text-[#5A5A40] transition-colors"
+                className="hidden sm:flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-blue-700/40 hover:text-blue-700 transition-colors"
               >
                 <Shield className="w-4 h-4" />
                 {t('dash.adminPanel')}
@@ -542,7 +542,7 @@ function Dashboard() {
             )}
             <button 
               onClick={handleLogout}
-              className="p-2 hover:bg-[#F5F5F0] rounded-full transition-colors text-[#5A5A40]"
+              className="p-2 hover:bg-gray-100 rounded-full transition-colors text-blue-700"
             >
               <LogOut className="w-5 h-5" />
             </button>
@@ -566,10 +566,10 @@ function Dashboard() {
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 whileHover={{ scale: 1.02, y: -5 }}
                 transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                className="bg-white p-6 rounded-[32px] shadow-sm border border-black/5 cursor-default"
+                className="bg-white p-6 rounded-2xl shadow-sm border border-black/5 cursor-default"
               >
-                <p className="text-xs uppercase tracking-widest text-[#5A5A40]/60 mb-2 font-medium">{t('dash.totalBalance')}</p>
-                <h3 className="text-4xl font-serif">₹{balance.toLocaleString()}</h3>
+                <p className="text-xs uppercase tracking-widest text-blue-700/60 mb-2 font-medium">{t('dash.totalBalance')}</p>
+                <h3 className="text-4xl font-sans font-bold">₹{balance.toLocaleString()}</h3>
               </motion.div>
 
               <motion.div 
@@ -577,13 +577,13 @@ function Dashboard() {
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 whileHover={{ scale: 1.02, y: -5 }}
                 transition={{ delay: 0.1, type: "spring", stiffness: 300, damping: 20 }}
-                className="bg-white p-6 rounded-[32px] shadow-sm border border-black/5 cursor-default"
+                className="bg-white p-6 rounded-2xl shadow-sm border border-black/5 cursor-default"
               >
                 <div className="flex items-center gap-2 text-emerald-600 mb-2">
                   <TrendingUp className="w-4 h-4" />
                   <p className="text-xs uppercase tracking-widest font-medium">{t('income')}</p>
                 </div>
-                <h3 className="text-3xl font-serif">₹{totalIncome.toLocaleString()}</h3>
+                <h3 className="text-3xl font-sans font-bold">₹{totalIncome.toLocaleString()}</h3>
               </motion.div>
 
               <motion.div 
@@ -591,28 +591,57 @@ function Dashboard() {
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 whileHover={{ scale: 1.02, y: -5 }}
                 transition={{ delay: 0.2, type: "spring", stiffness: 300, damping: 20 }}
-                className="bg-white p-6 rounded-[32px] shadow-sm border border-black/5 cursor-default"
+                className="bg-white p-6 rounded-2xl shadow-sm border border-black/5 cursor-default"
               >
                 <div className="flex items-center gap-2 text-rose-600 mb-2">
                   <TrendingDown className="w-4 h-4" />
                   <p className="text-xs uppercase tracking-widest font-medium">{t('expense')}</p>
                 </div>
-                <h3 className="text-3xl font-serif">₹{totalExpense.toLocaleString()}</h3>
+                <h3 className="text-3xl font-sans font-bold">₹{totalExpense.toLocaleString()}</h3>
               </motion.div>
             </>
           )}
         </div>
+
+        {/* Notice Div - Moved here as requested */}
+        {!loading && (
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={cn(
+              "p-6 rounded-2xl border-2 flex items-start gap-4 shadow-md",
+              balance > 0 
+                ? "bg-emerald-50 border-emerald-200 text-emerald-800" 
+                : "bg-rose-50 border-rose-200 text-rose-800"
+            )}
+          >
+            <div className={cn(
+              "p-3 rounded-xl",
+              balance > 0 ? "bg-emerald-100" : "bg-rose-100"
+            )}>
+              <AlertCircle className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-lg font-sans font-bold mb-1">{t('dash.health')}</h3>
+              <p className="text-sm opacity-90 leading-relaxed font-medium">
+                {balance > 0 
+                  ? t('dash.healthGood')
+                  : t('dash.healthBad')}
+              </p>
+            </div>
+          </motion.div>
+        )}
 
         {/* Actions & List */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Transaction List */}
           <div className="lg:col-span-2 space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <h3 className="text-xl font-serif">{t('dash.recent')}</h3>
+              <h3 className="text-xl font-sans font-bold">{t('dash.recent')}</h3>
               <div className="flex items-center gap-2">
                 <button 
                   onClick={() => setIsExportModalOpen(true)}
-                  className="flex items-center gap-2 bg-white border border-black/5 text-[#5A5A40] px-4 py-2 rounded-full text-sm font-medium hover:bg-[#F5F5F0] transition-colors"
+                  className="flex items-center gap-2 bg-white border border-gray-200 text-blue-700 px-4 py-2 rounded-full text-sm font-bold hover:bg-gray-50 transition-colors"
                 >
                   <Download className="w-4 h-4" />
                   {t('dash.export')}
@@ -620,7 +649,7 @@ function Dashboard() {
                 {flatInfo?.role === 'admin' && (
                   <button 
                     onClick={() => setIsAdding(true)}
-                    className="flex items-center gap-2 bg-[#5A5A40] text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-[#4A4A30] transition-colors"
+                    className="flex items-center gap-2 bg-blue-700 text-white px-4 py-2 rounded-full text-sm font-bold hover:bg-blue-800 transition-colors"
                   >
                     <PlusCircle className="w-4 h-4" />
                     {t('dash.add')}
@@ -632,23 +661,23 @@ function Dashboard() {
             {/* Filters */}
             <div className="flex flex-col sm:flex-row gap-4">
               <div className="relative flex-1">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#5A5A40]/40" />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-700/40" />
                 <input 
                   type="text"
                   placeholder={t('dash.search')}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 bg-white border border-black/5 rounded-2xl focus:ring-2 focus:ring-[#5A5A40]/20 outline-none transition-all text-sm"
+                  className="w-full pl-12 pr-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none transition-all text-sm"
                 />
               </div>
-              <div className="flex bg-white border border-black/5 rounded-2xl p-1">
+              <div className="flex bg-white border border-gray-200 rounded-xl p-1">
                 {(['all', 'income', 'expense'] as const).map((type) => (
                   <button
                     key={type}
                     onClick={() => setFilterType(type)}
                     className={cn(
-                      "px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all",
-                      filterType === type ? "bg-[#5A5A40] text-white shadow-sm" : "text-[#5A5A40]/40 hover:text-[#5A5A40]"
+                      "px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest transition-all",
+                      filterType === type ? "bg-blue-700 text-white shadow-sm" : "text-blue-700/40 hover:text-blue-700"
                     )}
                   >
                     {t(type)}
@@ -677,9 +706,9 @@ function Dashboard() {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="text-center py-20 bg-white rounded-[32px] border border-dashed border-[#5A5A40]/20"
+                    className="text-center py-20 bg-white rounded-2xl border border-dashed border-blue-700/20"
                   >
-                    <p className="text-[#5A5A40]/40 font-serif italic">{t('dash.noTransactions')}</p>
+                    <p className="text-blue-700/40 font-sans italic">{t('dash.noTransactions')}</p>
                   </motion.div>
                 ) : (
                   filteredTransactions.map((t) => (
@@ -691,7 +720,7 @@ function Dashboard() {
                       exit={{ opacity: 0, x: 20 }}
                       whileHover={{ x: 5 }}
                       transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                      className="bg-white p-5 rounded-2xl shadow-sm border border-black/5 flex items-center justify-between group"
+                      className="bg-white p-5 rounded-xl shadow-sm border border-black/5 flex items-center justify-between group"
                     >
                       <div className="flex items-center gap-4">
                         <div className={cn(
@@ -701,8 +730,8 @@ function Dashboard() {
                           {t.type === 'income' ? <TrendingUp className="w-6 h-6" /> : <TrendingDown className="w-6 h-6" />}
                         </div>
                         <div>
-                          <h4 className="font-medium text-[#1A1A1A]">{t.category}</h4>
-                          <p className="text-xs text-[#5A5A40]/60">
+                          <h4 className="font-bold text-gray-900">{t.category}</h4>
+                          <p className="text-xs text-blue-700/60">
                             {t.date ? format(t.date.toDate(), 'MMM d, yyyy • h:mm a') : 'Processing...'}
                           </p>
                         </div>
@@ -710,12 +739,12 @@ function Dashboard() {
                       <div className="flex items-center gap-6">
                         <div className="text-right">
                           <p className={cn(
-                            "font-serif text-lg",
+                            "font-sans font-bold text-lg",
                             t.type === 'income' ? "text-emerald-600" : "text-rose-600"
                           )}>
                             {t.type === 'income' ? '+' : '-'} ₹{t.amount.toLocaleString()}
                           </p>
-                          <p className="text-[10px] uppercase tracking-widest text-[#5A5A40]/40 font-medium">
+                          <p className="text-[10px] uppercase tracking-widest text-blue-700/40 font-bold">
                             By {t.createdBy}
                           </p>
                         </div>
@@ -738,14 +767,14 @@ function Dashboard() {
 
           {/* Charts Sidebar */}
           <div className="space-y-6">
-            <div className="bg-white p-6 rounded-[32px] shadow-sm border border-black/5">
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-black/5">
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-serif">{t('chart.overview')}</h3>
+                <h3 className="text-lg font-sans font-bold">{t('chart.overview')}</h3>
                 <div className="flex gap-2">
                   <select 
                     value={chartView}
                     onChange={(e) => setChartView(e.target.value as any)}
-                    className="text-xs bg-[#F5F5F0] border-none rounded-lg px-2 py-1 outline-none font-medium"
+                    className="text-xs bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 outline-none font-bold"
                   >
                     <option value="pie">{t('chart.pie')}</option>
                     <option value="line">{t('chart.line')}</option>
@@ -758,8 +787,8 @@ function Dashboard() {
                   <button 
                     onClick={() => setTimeRange('monthly')}
                     className={cn(
-                      "flex-1 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all",
-                      timeRange === 'monthly' ? "bg-[#5A5A40] text-white" : "bg-[#F5F5F0] text-[#5A5A40]/40"
+                      "flex-1 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all",
+                      timeRange === 'monthly' ? "bg-blue-700 text-white" : "bg-gray-50 text-blue-700/40"
                     )}
                   >
                     {t('pdf.monthly')}
@@ -767,8 +796,8 @@ function Dashboard() {
                   <button 
                     onClick={() => setTimeRange('yearly')}
                     className={cn(
-                      "flex-1 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all",
-                      timeRange === 'yearly' ? "bg-[#5A5A40] text-white" : "bg-[#F5F5F0] text-[#5A5A40]/40"
+                      "flex-1 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all",
+                      timeRange === 'yearly' ? "bg-blue-700 text-white" : "bg-gray-50 text-blue-700/40"
                     )}
                   >
                     {t('pdf.yearly')}
@@ -779,7 +808,7 @@ function Dashboard() {
                   <select 
                     value={selectedYear}
                     onChange={(e) => setSelectedYear(Number(e.target.value))}
-                    className="flex-1 text-xs bg-[#F5F5F0] border-none rounded-xl px-3 py-2 outline-none font-medium"
+                    className="flex-1 text-xs bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 outline-none font-bold"
                   >
                     {years.map(y => <option key={y} value={y}>{y}</option>)}
                   </select>
@@ -787,7 +816,7 @@ function Dashboard() {
                     <select 
                       value={selectedMonth}
                       onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                      className="flex-1 text-xs bg-[#F5F5F0] border-none rounded-xl px-3 py-2 outline-none font-medium"
+                      className="flex-1 text-xs bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 outline-none font-bold"
                     >
                       {Array.from({ length: 12 }).map((_, i) => (
                         <option key={i} value={i}>{format(new Date(2024, i), 'MMMM')}</option>
@@ -826,12 +855,12 @@ function Dashboard() {
                         dataKey="name" 
                         axisLine={false} 
                         tickLine={false} 
-                        tick={{ fontSize: 10, fill: '#5A5A40' }} 
+                        tick={{ fontSize: 10, fill: '#1e40af' }} 
                       />
                       <YAxis 
                         axisLine={false} 
                         tickLine={false} 
-                        tick={{ fontSize: 10, fill: '#5A5A40' }}
+                        tick={{ fontSize: 10, fill: '#1e40af' }}
                         tickFormatter={(value) => `₹${value}`}
                       />
                       <Tooltip 
@@ -858,37 +887,27 @@ function Dashboard() {
                 </ResponsiveContainer>
               </div>
             </div>
-
-            <div className="bg-[#5A5A40] p-6 rounded-[32px] text-white">
-              <h3 className="text-lg font-serif mb-2">{t('dash.health')}</h3>
-              <p className="text-sm text-white/70 leading-relaxed">
-                {balance > 0 
-                  ? t('dash.healthGood')
-                  : t('dash.healthBad')}
-              </p>
-            </div>
           </div>
         </div>
       </main>
-
-      <footer className="max-w-5xl mx-auto px-4 py-8 border-t border-black/5 mt-8 text-center">
-        <p className="text-sm font-serif text-[#5A5A40] mb-4">Made by Manthan - F602</p>
+       <footer className="max-w-5xl mx-auto px-4 py-8 border-t border-black/5 mt-8 text-center">
+        <p className="text-sm font-sans font-bold text-blue-700 mb-4">Made by Manthan - F602</p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
           <a 
             href="https://manthank.com" 
             target="_blank" 
             rel="noopener noreferrer"
-            className="text-xs font-bold uppercase tracking-widest text-white bg-[#5A5A40] px-6 py-3 rounded-full hover:bg-[#4A4A30] transition-colors shadow-sm"
+            className="text-xs font-bold uppercase tracking-widest text-white bg-blue-700 px-6 py-3 rounded-full hover:bg-blue-800 transition-colors shadow-sm"
           >
             Visit Website
           </a>
           <div className="flex items-center gap-3">
-            <span className="text-xs text-[#5A5A40]/60">If any issue, contact dev@manthank.com</span>
+            <span className="text-xs text-blue-700/60">If any issue, contact dev@manthank.com</span>
             <a 
               href="https://mail.google.com/mail/?view=cm&fs=1&to=dev@manthank.com" 
               target="_blank" 
               rel="noopener noreferrer"
-              className="text-xs font-bold uppercase tracking-widest text-[#5A5A40] border border-[#5A5A40]/20 px-6 py-3 rounded-full hover:bg-[#F5F5F0] transition-colors"
+              className="text-xs font-bold uppercase tracking-widest text-blue-700 border border-blue-700/20 px-6 py-3 rounded-full hover:bg-gray-50 transition-colors"
             >
               Email Support
             </a>
@@ -911,9 +930,9 @@ function Dashboard() {
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-lg bg-white rounded-[32px] p-8 shadow-2xl"
+              className="relative w-full max-w-lg bg-white rounded-2xl p-8 shadow-2xl"
             >
-              <h3 className="text-2xl font-serif mb-6">{t('tx.new')}</h3>
+              <h3 className="text-2xl font-sans font-bold mb-6">{t('tx.new')}</h3>
               <form 
                 onSubmit={async (e) => {
                   e.preventDefault();
@@ -940,14 +959,14 @@ function Dashboard() {
                 <div className="grid grid-cols-2 gap-4">
                   <label className="relative cursor-pointer">
                     <input type="radio" name="type" value="income" defaultChecked className="peer sr-only" />
-                    <div className="p-4 rounded-2xl bg-[#F5F5F0] border-2 border-transparent peer-checked:border-emerald-500 peer-checked:bg-emerald-50 transition-all text-center">
+                    <div className="p-4 rounded-xl bg-gray-50 border-2 border-transparent peer-checked:border-emerald-500 peer-checked:bg-emerald-50 transition-all text-center">
                       <TrendingUp className="w-6 h-6 mx-auto mb-2 text-emerald-600" />
                       <span className="text-xs font-bold uppercase tracking-widest">{t('income')}</span>
                     </div>
                   </label>
                   <label className="relative cursor-pointer">
                     <input type="radio" name="type" value="expense" className="peer sr-only" />
-                    <div className="p-4 rounded-2xl bg-[#F5F5F0] border-2 border-transparent peer-checked:border-rose-500 peer-checked:bg-rose-50 transition-all text-center">
+                    <div className="p-4 rounded-xl bg-gray-50 border-2 border-transparent peer-checked:border-rose-500 peer-checked:bg-rose-50 transition-all text-center">
                       <TrendingDown className="w-6 h-6 mx-auto mb-2 text-rose-600" />
                       <span className="text-xs font-bold uppercase tracking-widest">{t('expense')}</span>
                     </div>
@@ -956,21 +975,21 @@ function Dashboard() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs uppercase tracking-widest text-[#5A5A40] mb-2 font-medium">{t('tx.amount')} (₹)</label>
+                    <label className="block text-xs uppercase tracking-widest text-blue-700 mb-2 font-bold">{t('tx.amount')} (₹)</label>
                     <input 
                       name="amount"
                       type="number"
                       required
                       placeholder="0.00"
-                      className="w-full px-4 py-3 bg-[#F5F5F0] border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40]/20 outline-none"
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs uppercase tracking-widest text-[#5A5A40] mb-2 font-medium">{t('tx.category')}</label>
+                    <label className="block text-xs uppercase tracking-widest text-blue-700 mb-2 font-bold">{t('tx.category')}</label>
                     <select 
                       name="category"
                       required
-                      className="w-full px-4 py-3 bg-[#F5F5F0] border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40]/20 outline-none appearance-none"
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none appearance-none font-bold"
                     >
                       {CATEGORIES.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                     </select>
@@ -978,12 +997,12 @@ function Dashboard() {
                 </div>
 
                 <div>
-                  <label className="block text-xs uppercase tracking-widest text-[#5A5A40] mb-2 font-medium">{t('tx.description')}</label>
+                  <label className="block text-xs uppercase tracking-widest text-blue-700 mb-2 font-bold">{t('tx.description')}</label>
                   <textarea 
                     name="description"
                     rows={3}
                     placeholder={t('tx.descPlaceholder')}
-                    className="w-full px-4 py-3 bg-[#F5F5F0] border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40]/20 outline-none resize-none"
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none resize-none"
                   />
                 </div>
 
@@ -991,13 +1010,13 @@ function Dashboard() {
                   <button 
                     type="button"
                     onClick={() => setIsAdding(false)}
-                    className="flex-1 py-4 rounded-full font-medium text-[#5A5A40] bg-[#F5F5F0] hover:bg-black/5 transition-colors"
+                    className="flex-1 py-4 rounded-full font-bold text-blue-700 bg-gray-50 hover:bg-gray-100 transition-colors"
                   >
                     {t('cancel')}
                   </button>
                   <button 
                     type="submit"
-                    className="flex-1 bg-[#5A5A40] text-white py-4 rounded-full font-medium hover:bg-[#4A4A30] transition-colors"
+                    className="flex-1 bg-blue-700 text-white py-4 rounded-full font-bold hover:bg-blue-800 transition-colors"
                   >
                     {t('tx.save')}
                   </button>
@@ -1022,17 +1041,17 @@ function Dashboard() {
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-md bg-white rounded-[32px] p-8 shadow-2xl"
+              className="relative w-full max-w-md bg-white rounded-2xl p-8 shadow-2xl"
             >
-              <h3 className="text-2xl font-serif mb-6">{t('pdf.generate')}</h3>
+              <h3 className="text-2xl font-sans font-bold mb-6">{t('pdf.generate')}</h3>
               
               <div className="space-y-6">
-                <div className="flex gap-2 p-1 bg-[#F5F5F0] rounded-2xl">
+                <div className="flex gap-2 p-1 bg-gray-50 rounded-xl border border-gray-200">
                   <button 
                     onClick={() => setExportType('monthly')}
                     className={cn(
-                      "flex-1 py-3 rounded-xl text-xs font-bold uppercase tracking-widest transition-all",
-                      exportType === 'monthly' ? "bg-[#5A5A40] text-white shadow-sm" : "text-[#5A5A40]/40"
+                      "flex-1 py-3 rounded-lg text-xs font-bold uppercase tracking-widest transition-all",
+                      exportType === 'monthly' ? "bg-blue-700 text-white shadow-sm" : "text-blue-700/40"
                     )}
                   >
                     {t('pdf.monthly')}
@@ -1040,8 +1059,8 @@ function Dashboard() {
                   <button 
                     onClick={() => setExportType('yearly')}
                     className={cn(
-                      "flex-1 py-3 rounded-xl text-xs font-bold uppercase tracking-widest transition-all",
-                      exportType === 'yearly' ? "bg-[#5A5A40] text-white shadow-sm" : "text-[#5A5A40]/40"
+                      "flex-1 py-3 rounded-lg text-xs font-bold uppercase tracking-widest transition-all",
+                      exportType === 'yearly' ? "bg-blue-700 text-white shadow-sm" : "text-blue-700/40"
                     )}
                   >
                     {t('pdf.yearly')}
@@ -1050,22 +1069,22 @@ function Dashboard() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs uppercase tracking-widest text-[#5A5A40] mb-2 font-medium">{t('pdf.year')}</label>
+                    <label className="block text-xs uppercase tracking-widest text-blue-700 mb-2 font-bold">{t('pdf.year')}</label>
                     <select 
                       value={exportYear}
                       onChange={(e) => setExportYear(Number(e.target.value))}
-                      className="w-full px-4 py-3 bg-[#F5F5F0] border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40]/20 outline-none appearance-none font-medium"
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none appearance-none font-bold"
                     >
                       {years.map(y => <option key={y} value={y}>{y}</option>)}
                     </select>
                   </div>
                   {exportType === 'monthly' && (
                     <div>
-                      <label className="block text-xs uppercase tracking-widest text-[#5A5A40] mb-2 font-medium">{t('pdf.month')}</label>
+                      <label className="block text-xs uppercase tracking-widest text-blue-700 mb-2 font-bold">{t('pdf.month')}</label>
                       <select 
                         value={exportMonth}
                         onChange={(e) => setExportMonth(Number(e.target.value))}
-                        className="w-full px-4 py-3 bg-[#F5F5F0] border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40]/20 outline-none appearance-none font-medium"
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none appearance-none font-bold"
                       >
                         {Array.from({ length: 12 }).map((_, i) => (
                           <option key={i} value={i}>{format(new Date(2024, i), 'MMMM')}</option>
@@ -1078,13 +1097,13 @@ function Dashboard() {
                 <div className="flex gap-4 pt-4">
                   <button 
                     onClick={() => setIsExportModalOpen(false)}
-                    className="flex-1 py-4 rounded-full font-medium text-[#5A5A40] bg-[#F5F5F0] hover:bg-black/5 transition-colors"
+                    className="flex-1 py-4 rounded-full font-bold text-blue-700 bg-gray-50 hover:bg-gray-100 transition-colors"
                   >
                     {t('cancel')}
                   </button>
                   <button 
                     onClick={() => exportToPDF(exportType, exportYear, exportMonth)}
-                    className="flex-1 bg-[#5A5A40] text-white py-4 rounded-full font-medium hover:bg-[#4A4A30] transition-colors flex items-center justify-center gap-2"
+                    className="flex-1 bg-blue-700 text-white py-4 rounded-full font-bold hover:bg-blue-800 transition-colors flex items-center justify-center gap-2"
                   >
                     <Download className="w-4 h-4" />
                     {t('pdf.download')}
@@ -1111,25 +1130,25 @@ function Dashboard() {
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-sm bg-white rounded-[32px] p-8 shadow-2xl text-center"
+              className="relative w-full max-w-sm bg-white rounded-2xl p-8 shadow-2xl text-center"
             >
               <div className="w-16 h-16 bg-rose-50 rounded-full flex items-center justify-center mx-auto mb-4">
                 <AlertCircle className="text-rose-600 w-8 h-8" />
               </div>
-              <h3 className="text-xl font-serif mb-2">{t('del.title')}</h3>
-              <p className="text-sm text-[#5A5A40]/60 mb-8">
+              <h3 className="text-xl font-sans font-bold mb-2">{t('del.title')}</h3>
+              <p className="text-sm text-gray-500 mb-8">
                 {t('del.desc')}
               </p>
               <div className="flex gap-4">
                 <button 
                   onClick={() => setDeletingId(null)}
-                  className="flex-1 py-3 rounded-full font-medium text-[#5A5A40] bg-[#F5F5F0] hover:bg-black/5 transition-colors"
+                  className="flex-1 py-3 rounded-full font-bold text-blue-700 bg-gray-50 hover:bg-gray-100 transition-colors"
                 >
                   {t('cancel')}
                 </button>
                 <button 
                   onClick={() => handleDelete(deletingId)}
-                  className="flex-1 bg-rose-600 text-white py-3 rounded-full font-medium hover:bg-rose-700 transition-colors"
+                  className="flex-1 bg-rose-600 text-white py-3 rounded-full font-bold hover:bg-rose-700 transition-colors"
                 >
                   {t('del.confirm')}
                 </button>

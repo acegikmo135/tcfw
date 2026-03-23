@@ -42,6 +42,7 @@ const translations = {
     "dash.health": "Financial Health",
     "dash.healthGood": "The building fund is healthy. We have a positive surplus for future maintenance.",
     "dash.healthBad": "The building fund is currently in deficit. Please ensure all dues are cleared.",
+    "dash.notify": "Notify",
     
     // Transaction Modal
     "tx.new": "New Transaction",
@@ -149,6 +150,7 @@ const translations = {
     "dash.health": "નાણાકીય આરોગ્ય",
     "dash.healthGood": "બિલ્ડિંગ ફંડ સ્વસ્થ છે. ભવિષ્યની જાળવણી માટે આપણી પાસે સકારાત્મક સરપ્લસ છે.",
     "dash.healthBad": "બિલ્ડિંગ ફંડ હાલમાં ખાધમાં છે. કૃપા કરીને ખાતરી કરો કે તમામ બાકી રકમ ચૂકવવામાં આવી છે.",
+    "dash.notify": "સૂચના",
     
     // Transaction Modal
     "tx.new": "નવો વ્યવહાર",
