@@ -47,7 +47,8 @@ import {
   Fingerprint,
   Eye,
   EyeOff,
-  Smartphone
+  Smartphone,
+  Bell
 } from 'lucide-react';
 import OneSignal from 'react-onesignal';
 import { clsx, type ClassValue } from 'clsx';
@@ -1129,8 +1130,25 @@ function Dashboard() {
               </p>
             </div>
 
-            <div className="mt-4">
-              <InstallPWA />
+            <div className="mt-4 flex gap-2">
+              <div className="flex-1">
+                <InstallPWA alwaysShow={true} />
+              </div>
+              <button
+                onClick={() => {
+                  try {
+                    OneSignal.Slidedown.promptPush();
+                  } catch (e) {
+                    console.error("OneSignal prompt error:", e);
+                    alert("Notification prompt is not available at the moment.");
+                  }
+                }}
+                className="flex items-center justify-center gap-2 bg-white/10 text-white px-6 py-3 rounded-2xl font-medium hover:bg-white/20 transition-all text-xs font-bold uppercase tracking-widest"
+                title="Enable Notifications"
+              >
+                <Bell className="w-4 h-4" />
+                {t('dash.notify') || 'Notify'}
+              </button>
             </div>
           </div>
         </div>

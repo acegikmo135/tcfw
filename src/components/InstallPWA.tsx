@@ -12,7 +12,7 @@ interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
 }
 
-export function InstallPWA() {
+export function InstallPWA({ alwaysShow = true }: { alwaysShow?: boolean }) {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstallable, setIsInstallable] = useState(false);
   const { t } = useLanguage();
@@ -33,6 +33,11 @@ export function InstallPWA() {
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
+    // Check if already installed
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      setIsInstallable(false);
+    }
+
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     };
@@ -40,6 +45,11 @@ export function InstallPWA() {
 
   const handleInstallClick = async () => {
     if (!deferredPrompt) {
+      if (window.matchMedia('(display-mode: standalone)').matches) {
+        alert("App is already installed and running in standalone mode.");
+      } else {
+        alert("Installation prompt is not available. You can install this app through your browser's menu (e.g., 'Add to Home Screen').");
+      }
       return;
     }
     // Show the install prompt
@@ -56,7 +66,7 @@ export function InstallPWA() {
     setIsInstallable(false);
   };
 
-  if (!isInstallable) {
+  if (!isInstallable && !alwaysShow) {
     return null;
   }
 
@@ -66,7 +76,7 @@ export function InstallPWA() {
       className="flex items-center justify-center gap-2 bg-white/10 text-white px-6 py-3 rounded-2xl font-medium hover:bg-white/20 transition-all w-full text-xs font-bold uppercase tracking-widest"
     >
       <Download className="w-4 h-4" />
-      {t('pwa.install')}
+      {isInstallable ? t('pwa.install') : (window.matchMedia('(display-mode: standalone)').matches ? "App Installed" : t('pwa.install'))}
     </button>
   );
 }
