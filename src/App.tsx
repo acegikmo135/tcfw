@@ -44,11 +44,12 @@ import {
   Download,
   Search,
   Filter,
-  Fingerprint,
   Eye,
   EyeOff,
   Smartphone,
-  Bell
+  Bell,
+  Pin,
+  Edit2
 } from 'lucide-react';
 import OneSignal from 'react-onesignal';
 import { clsx, type ClassValue } from 'clsx';
@@ -110,6 +111,7 @@ interface Notice {
   content: string;
   createdBy: string;
   createdAt: Timestamp;
+  isPinned?: boolean;
 }
 
 const CATEGORIES = [
@@ -146,8 +148,11 @@ function Dashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
   const [notices, setNotices] = useState<Notice[]>([]);
-  const [connectionError, setConnectionError] = useState<string | null>(null);
   const [categories, setCategories] = useState<{id: string, name: string}[]>([]);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [isAddingNotice, setIsAddingNotice] = useState(false);
+  const [editingNotice, setEditingNotice] = useState<Notice | null>(null);
+  const [noticeError, setNoticeError] = useState("");
 
   // Chart State
   const [chartView, setChartView] = useState<'pie' | 'line'>('pie');
@@ -195,12 +200,32 @@ function Dashboard() {
           serviceWorkerParam: { scope: '/' },
           serviceWorkerPath: 'OneSignalSDKWorker.js',
         });
-        OneSignal.Slidedown.promptPush();
       } catch (e) {
         console.error("OneSignal init error:", e);
       }
     };
     initOneSignal();
+  }, []);
+
+  // Initialize Default Categories
+  useEffect(() => {
+    const initCategories = async () => {
+      const defaultCategories = [
+        { id: 'plumbing', name: 'Plumbing' },
+        { id: 'wiring', name: 'Wiring' },
+        { id: 'maintenance', name: 'Maintenance' },
+        { id: 'security', name: 'Security' },
+        { id: 'cleaning', name: 'Cleaning' },
+        { id: 'others', name: 'Others' }
+      ];
+      
+      try {
+        const q = query(collection(db, 'categories'));
+        const snap = await getDocFromServer(doc(db, 'test', 'check')); // Dummy check
+        // We'll just check if the collection is empty in the onSnapshot below
+      } catch (e) {}
+    };
+    initCategories();
   }, []);
 
   useEffect(() => {
@@ -211,14 +236,7 @@ function Dashboard() {
         name: doc.data().name
       }));
       if (data.length === 0) {
-        setCategories([
-          { id: 'plumbing', name: 'Plumbing' },
-          { id: 'wiring', name: 'Wiring' },
-          { id: 'maintenance', name: 'Maintenance' },
-          { id: 'security', name: 'Security' },
-          { id: 'cleaning', name: 'Cleaning' },
-          { id: 'others', name: 'Others' }
-        ]);
+        setCategories(CATEGORIES.map(c => ({ id: c.id, name: c.name })));
       } else {
         setCategories(data);
       }
@@ -268,7 +286,7 @@ function Dashboard() {
   // Notices Listener
   useEffect(() => {
     if (!user) return;
-    const q = query(collection(db, 'notices'), orderBy('createdAt', 'desc'));
+    const q = query(collection(db, 'notices'), orderBy('isPinned', 'desc'), orderBy('createdAt', 'desc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({
         id: doc.id,
@@ -280,6 +298,85 @@ function Dashboard() {
     });
     return () => unsubscribe();
   }, [user]);
+
+  const addNotice = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setNoticeError("");
+    const formData = new FormData(e.currentTarget);
+    const title = (formData.get('title') as string).trim();
+    const content = (formData.get('content') as string).trim();
+
+    if (!title || !content) {
+      setNoticeError("Please fill all fields.");
+      return;
+    }
+
+    try {
+      if (!user || !user.email) throw new Error("Not authenticated");
+      
+      if (editingNotice) {
+        await updateDoc(doc(db, 'notices', editingNotice.id), {
+          title,
+          content
+        });
+        
+        // Trigger notification for update
+        fetch('/api/notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: "Notice Updated",
+            message: `${title}: ${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`,
+            url: window.location.origin
+          })
+        }).catch(err => console.error("Notification error:", err));
+      } else {
+        await addDoc(collection(db, 'notices'), {
+          title,
+          content,
+          createdBy: flatInfo?.flatNo || user.email.split('@')[0],
+          createdAt: serverTimestamp(),
+          isPinned: false
+        });
+
+        // Trigger notification
+        fetch('/api/notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: "New Notice",
+            message: `${title}: ${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`,
+            url: window.location.origin
+          })
+        }).catch(err => console.error("Notification error:", err));
+      }
+      
+      setIsAddingNotice(false);
+      setEditingNotice(null);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, 'notices');
+    }
+  };
+
+  const deleteNotice = async (id: string) => {
+    if (window.confirm("Are you sure you want to delete this notice?")) {
+      try {
+        await deleteDoc(doc(db, 'notices', id));
+      } catch (error) {
+        handleFirestoreError(error, OperationType.DELETE, `notices/${id}`);
+      }
+    }
+  };
+
+  const togglePinNotice = async (notice: Notice) => {
+    try {
+      await updateDoc(doc(db, 'notices', notice.id), {
+        isPinned: !notice.isPinned
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `notices/${notice.id}`);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -516,83 +613,6 @@ function Dashboard() {
 
   const COLORS = ['#5A5A40', '#8E8E6B', '#C2C296', '#E6E6D1', '#A3A375', '#70704F'];
 
-  const handlePasskeyLogin = async () => {
-    try {
-      if (!loginFlatNo) {
-        setAuthError("Please enter your Flat Number first.");
-        return;
-      }
-
-      const email = `${loginFlatNo.toLowerCase()}@building.local`;
-
-      // 1. Get options from server
-      const optionsRes = await fetch("/api/auth/login/options", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email })
-      });
-      
-      if (!optionsRes.ok) {
-        const errData = await optionsRes.json();
-        throw new Error(errData.error || "Failed to get login options");
-      }
-      const options = await optionsRes.json();
-
-      // 2. Convert options for navigator.credentials.get
-      const publicKeyCredentialRequestOptions: PublicKeyCredentialRequestOptions = {
-        ...options,
-        challenge: Uint8Array.from(atob(options.challenge), c => c.charCodeAt(0)),
-        allowCredentials: options.allowCredentials.map((cred: any) => ({
-          ...cred,
-          id: Uint8Array.from(atob(cred.id), c => c.charCodeAt(0))
-        }))
-      };
-
-      const credential = await navigator.credentials.get({
-        publicKey: publicKeyCredentialRequestOptions
-      }) as any;
-
-      if (credential) {
-        // 3. Verify with server
-        const verifyRes = await fetch("/api/auth/login/verify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            email,
-            assertionResponse: {
-              id: credential.id,
-              rawId: btoa(String.fromCharCode(...new Uint8Array(credential.rawId))),
-              response: {
-                authenticatorData: btoa(String.fromCharCode(...new Uint8Array(credential.response.authenticatorData))),
-                clientDataJSON: btoa(String.fromCharCode(...new Uint8Array(credential.response.clientDataJSON))),
-                signature: btoa(String.fromCharCode(...new Uint8Array(credential.response.signature))),
-                userHandle: credential.response.userHandle ? btoa(String.fromCharCode(...new Uint8Array(credential.response.userHandle))) : null
-              }
-            }
-          })
-        });
-
-        if (!verifyRes.ok) {
-          const errData = await verifyRes.json();
-          throw new Error(errData.error || "Failed to verify passkey login");
-        }
-
-        const verifyData = await verifyRes.json();
-        const { customToken } = verifyData;
-
-        // 4. Sign in with Firebase Custom Token
-        await signInWithCustomToken(auth, customToken);
-      }
-    } catch (err: any) {
-      console.error("Error during passkey login:", err);
-      if (err.name === 'NotAllowedError' || err.message.includes('Permissions Policy')) {
-        setAuthError("Passkeys are restricted in this preview window. Please open the app in a new tab to sign in with a passkey.");
-      } else {
-        setAuthError(err.message || "Failed to sign in with passkey.");
-      }
-    }
-  };
-
   if (!user && !loading) {
     return (
       <div className="min-h-screen bg-[#F5F5F0] flex items-center justify-center p-4">
@@ -660,25 +680,6 @@ function Dashboard() {
               {t('login.enter')}
             </button>
           </form>
-
-          <div className="mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-black/5"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-[#5A5A40]/60">Or continue with</span>
-              </div>
-            </div>
-
-            <button
-              onClick={handlePasskeyLogin}
-              className="mt-6 w-full flex items-center justify-center gap-2 bg-[#F5F5F0] text-[#1A1A1A] py-4 rounded-full font-medium hover:bg-[#EAEAE0] transition-colors border border-black/5"
-            >
-              <Fingerprint className="w-5 h-5 text-[#5A5A40]" />
-              Sign in with Passkey
-            </button>
-          </div>
 
           <div className="mt-8 pt-6 border-t border-black/5 text-center space-y-4">
             <p className="text-xs text-[#5A5A40]/40 uppercase tracking-tighter">
@@ -825,7 +826,12 @@ function Dashboard() {
                 {notices.map((notice) => (
                   <div key={notice.id} className="p-4 bg-[#F5F5F0] rounded-2xl">
                     <div className="flex justify-between items-start mb-2">
-                      <h4 className="font-medium text-[#1A1A1A]">{notice.title}</h4>
+                      <div>
+                        <h4 className="font-medium text-[#1A1A1A]">{notice.title}</h4>
+                        <p className="text-[10px] uppercase tracking-widest font-bold text-[#5A5A40]/40 mt-1">
+                          By {notice.createdBy}
+                        </p>
+                      </div>
                       <span className="text-[10px] uppercase tracking-widest font-bold text-[#5A5A40]/40">
                         {notice.createdAt?.toDate ? notice.createdAt.toDate().toLocaleDateString() : 'Just now'}
                       </span>
@@ -889,6 +895,89 @@ function Dashboard() {
                     {t(type)}
                   </button>
                 ))}
+              </div>
+            </div>
+
+            {/* Notices Section */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-serif">Building Notices</h3>
+                {flatInfo?.role === 'admin' && (
+                  <button 
+                    onClick={() => {
+                      setEditingNotice(null);
+                      setIsAddingNotice(true);
+                    }}
+                    className="text-[#5A5A40] hover:bg-[#5A5A40]/5 p-2 rounded-full transition-colors"
+                  >
+                    <PlusCircle className="w-5 h-5" />
+                  </button>
+                )}
+              </div>
+              
+              <div className="grid grid-cols-1 gap-4">
+                {notices.map((notice) => (
+                  <motion.div 
+                    key={notice.id}
+                    layout
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={cn(
+                      "bg-white p-6 rounded-[32px] shadow-sm border transition-all",
+                      notice.isPinned ? "border-[#5A5A40]/30 bg-[#5A5A40]/5" : "border-black/5"
+                    )}
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-2">
+                          {notice.isPinned && <Pin className="w-4 h-4 text-[#5A5A40]" />}
+                          <h4 className="font-serif text-lg">{notice.title}</h4>
+                        </div>
+                        <p className="text-[10px] uppercase tracking-widest font-bold text-[#5A5A40]/40 mt-1">
+                          {notice.createdAt?.toDate ? notice.createdAt.toDate().toLocaleDateString() : 'Just now'} • By {notice.createdBy}
+                        </p>
+                      </div>
+                      {flatInfo?.role === 'admin' && (
+                        <div className="flex items-center gap-1">
+                          <button 
+                            onClick={() => togglePinNotice(notice)}
+                            className={cn(
+                              "p-2 rounded-full transition-colors",
+                              notice.isPinned ? "text-[#5A5A40] bg-[#5A5A40]/10" : "text-[#5A5A40]/40 hover:bg-[#F5F5F0]"
+                            )}
+                          >
+                            <Pin className="w-4 h-4" />
+                          </button>
+                          <button 
+                            onClick={() => {
+                              setEditingNotice(notice);
+                              setIsAddingNotice(true);
+                            }}
+                            className="p-2 text-[#5A5A40]/40 hover:text-[#5A5A40] hover:bg-[#F5F5F0] rounded-full transition-colors"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button 
+                            onClick={() => deleteNotice(notice.id)}
+                            className="p-2 text-rose-500/40 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-sm text-[#5A5A40]/80 mb-4 whitespace-pre-wrap leading-relaxed">{notice.content}</p>
+                    <div className="flex items-center justify-between text-[10px] uppercase tracking-widest font-bold text-[#5A5A40]/40">
+                      <span>By {notice.createdBy}</span>
+                      <span>{notice.createdAt?.toDate ? format(notice.createdAt.toDate(), 'MMM d, yyyy') : 'Just now'}</span>
+                    </div>
+                  </motion.div>
+                ))}
+                {notices.length === 0 && (
+                  <div className="text-center py-12 bg-white rounded-[32px] border border-dashed border-[#5A5A40]/20">
+                    <p className="text-[#5A5A40]/40 font-serif italic">No notices at the moment.</p>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1143,7 +1232,7 @@ function Dashboard() {
                     alert("Notification prompt is not available at the moment.");
                   }
                 }}
-                className="flex items-center justify-center gap-2 bg-white/10 text-white px-6 py-3 rounded-2xl font-medium hover:bg-white/20 transition-all text-xs font-bold uppercase tracking-widest"
+                className="flex items-center justify-center gap-2 bg-[#5A5A40] text-white px-6 py-3 rounded-2xl font-medium hover:bg-[#4A4A30] transition-all text-xs font-bold uppercase tracking-widest shadow-lg shadow-[#5A5A40]/20"
                 title="Enable Notifications"
               >
                 <Bell className="w-4 h-4" />
@@ -1219,7 +1308,7 @@ function Dashboard() {
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({
                         title: `New ${data.type === 'income' ? 'Income' : 'Expense'}`,
-                        message: `${data.description || data.category}: ₹${data.amount} by ${data.createdBy}`,
+                        message: `${data.description || data.category}: ₹${data.amount.toLocaleString()} by ${data.createdBy}`,
                         url: window.location.origin
                       })
                     }).catch(err => console.error("Notification error:", err));

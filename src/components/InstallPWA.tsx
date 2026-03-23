@@ -73,7 +73,7 @@ export function InstallPWA({ alwaysShow = true }: { alwaysShow?: boolean }) {
   return (
     <button
       onClick={handleInstallClick}
-      className="flex items-center justify-center gap-2 bg-white/10 text-white px-6 py-3 rounded-2xl font-medium hover:bg-white/20 transition-all w-full text-xs font-bold uppercase tracking-widest"
+      className="flex items-center justify-center gap-2 bg-[#5A5A40] text-white px-6 py-3 rounded-2xl font-medium hover:bg-[#4A4A30] transition-all w-full text-xs font-bold uppercase tracking-widest shadow-lg shadow-[#5A5A40]/20"
     >
       <Download className="w-4 h-4" />
       {isInstallable ? t('pwa.install') : (window.matchMedia('(display-mode: standalone)').matches ? "App Installed" : t('pwa.install'))}

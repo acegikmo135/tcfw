@@ -63,9 +63,6 @@ export function AdminPanel() {
   const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
   const [isAddingNotice, setIsAddingNotice] = useState(false);
-  const [isManagingCategories, setIsManagingCategories] = useState(false);
-  const [newCategoryName, setNewCategoryName] = useState("");
-  const [categories, setCategories] = useState<{id: string, name: string}[]>([]);
   const [addError, setAddError] = useState("");
   const [noticeError, setNoticeError] = useState("");
 
@@ -118,21 +115,9 @@ export function AdminPanel() {
       handleFirestoreError(error, OperationType.GET, 'notices');
     });
 
-    const qCategories = query(collection(db, 'categories'), orderBy('name', 'asc'));
-    const unsubscribeCategories = onSnapshot(qCategories, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({
-        id: doc.id,
-        name: doc.data().name
-      }));
-      setCategories(data);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, 'categories');
-    });
-
     return () => {
       unsubscribeFlats();
       unsubscribeNotices();
-      unsubscribeCategories();
     };
   }, [isAuthorized]);
 
@@ -259,29 +244,6 @@ export function AdminPanel() {
         await deleteDoc(doc(db, 'notices', id));
       } catch (error) {
         handleFirestoreError(error, OperationType.DELETE, `notices/${id}`);
-      }
-    }
-  };
-
-  const addCategory = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!newCategoryName.trim()) return;
-    try {
-      await setDoc(doc(db, 'categories', newCategoryName.trim().toLowerCase()), { 
-        name: newCategoryName.trim() 
-      });
-      setNewCategoryName("");
-    } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, 'categories');
-    }
-  };
-
-  const deleteCategory = async (id: string) => {
-    if (window.confirm("Delete this category?")) {
-      try {
-        await deleteDoc(doc(db, 'categories', id));
-      } catch (error) {
-        handleFirestoreError(error, OperationType.DELETE, `categories/${id}`);
       }
     }
   };
@@ -468,40 +430,6 @@ export function AdminPanel() {
             </div>
           )}
         </div>
-
-        <div className="flex items-center justify-between mb-8 mt-12 border-t border-black/5 pt-12">
-          <div>
-            <h2 className="text-3xl font-serif">Categories</h2>
-            <p className="text-[#5A5A40]/60 text-sm">Manage transaction categories</p>
-          </div>
-          <button 
-            onClick={() => setIsManagingCategories(true)}
-            className="bg-[#5A5A40] text-white px-6 py-3 rounded-full font-medium flex items-center gap-2 hover:bg-[#4A4A30] transition-all shadow-lg shadow-[#5A5A40]/20"
-          >
-            <Plus className="w-5 h-5" />
-            <span className="hidden sm:inline">Manage Categories</span>
-          </button>
-        </div>
-
-        <div className="flex flex-wrap gap-3">
-          {categories.map((cat) => (
-            <div 
-              key={cat.id}
-              className="bg-white px-4 py-2 rounded-full border border-black/5 flex items-center gap-2 group hover:border-[#5A5A40]/20 transition-all"
-            >
-              <span className="text-sm font-medium">{cat.name}</span>
-              <button 
-                onClick={() => deleteCategory(cat.id)}
-                className="p-1 text-rose-500/0 group-hover:text-rose-500 transition-all"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
-          ))}
-          {categories.length === 0 && (
-            <div className="text-sm text-[#5A5A40]/40 italic">Using default categories. Add one to customize.</div>
-          )}
-        </div>
       </main>
 
       <footer className="max-w-5xl mx-auto px-4 py-8 border-t border-black/5 mt-8 text-center">
@@ -622,70 +550,6 @@ export function AdminPanel() {
                   </button>
                 </div>
               </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-      {/* Manage Categories Modal */}
-      <AnimatePresence>
-        {isManagingCategories && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsManagingCategories(false)}
-              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-            />
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-md bg-white rounded-[32px] p-8 shadow-2xl"
-            >
-              <h3 className="text-2xl font-serif mb-6">Manage Categories</h3>
-              
-              <form onSubmit={addCategory} className="flex gap-2 mb-6">
-                <input 
-                  type="text"
-                  value={newCategoryName}
-                  onChange={(e) => setNewCategoryName(e.target.value)}
-                  placeholder="New category name"
-                  className="flex-1 px-4 py-3 bg-[#F5F5F0] border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40]/20 outline-none"
-                />
-                <button 
-                  type="submit"
-                  className="bg-[#5A5A40] text-white p-3 rounded-2xl hover:bg-[#4A4A30] transition-colors"
-                >
-                  <Plus className="w-6 h-6" />
-                </button>
-              </form>
-
-              <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2">
-                {categories.map((cat) => (
-                  <div key={cat.id} className="flex items-center justify-between p-3 bg-[#F5F5F0] rounded-2xl">
-                    <span className="font-medium">{cat.name}</span>
-                    <button 
-                      onClick={() => deleteCategory(cat.id)}
-                      className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-                {categories.length === 0 && (
-                  <p className="text-center text-[#5A5A40]/40 py-4 italic">No custom categories yet.</p>
-                )}
-              </div>
-
-              <div className="mt-8">
-                <button 
-                  onClick={() => setIsManagingCategories(false)}
-                  className="w-full py-4 rounded-full font-medium text-[#5A5A40] bg-[#F5F5F0] hover:bg-black/5 transition-colors"
-                >
-                  Close
-                </button>
-              </div>
             </motion.div>
           </div>
         )}

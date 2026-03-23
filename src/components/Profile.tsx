@@ -3,7 +3,7 @@ import { auth, db } from '../firebase';
 import { updatePassword, updateProfile, User } from 'firebase/auth';
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import { motion } from 'motion/react';
-import { ArrowLeft, Key, User as UserIcon, Loader2, CheckCircle2, Fingerprint } from 'lucide-react';
+import { ArrowLeft, Key, User as UserIcon, Loader2, CheckCircle2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
 export function Profile() {
@@ -14,7 +14,6 @@ export function Profile() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [hasPasskey, setHasPasskey] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -30,7 +29,6 @@ export function Profile() {
             const flatDoc = await getDoc(doc(db, 'flats', flatId));
             if (flatDoc.exists()) {
               if (flatDoc.data().name) setName(flatDoc.data().name);
-              if (flatDoc.data().passkeyEnabled) setHasPasskey(true);
             }
           }
         } catch (err) {
@@ -73,80 +71,10 @@ export function Profile() {
       setSuccess('Profile updated successfully!');
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
-      console.error(err);
-      setError(err.message || 'Failed to update profile. You may need to re-authenticate to change your password.');
+      console.error("Update error:", err);
+      setError(err.message || 'Failed to update profile');
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleAddPasskey = async () => {
-    if (!user) return;
-    setError('');
-    setSuccess('');
-
-    try {
-      if (!window.PublicKeyCredential) {
-        throw new Error("WebAuthn is not supported in this browser.");
-      }
-
-      // 1. Get options from server
-      const optionsRes = await fetch("/api/auth/register/options", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: user.email })
-      });
-      
-      if (!optionsRes.ok) throw new Error("Failed to get registration options");
-      const options = await optionsRes.json();
-
-      // 2. Convert options for navigator.credentials.create
-      const publicKeyCredentialCreationOptions: PublicKeyCredentialCreationOptions = {
-        ...options,
-        challenge: Uint8Array.from(atob(options.challenge), (c: string) => c.charCodeAt(0)),
-        user: {
-          ...options.user,
-          id: Uint8Array.from(atob(options.user.id), (c: string) => c.charCodeAt(0))
-        }
-      };
-
-      const credential = await navigator.credentials.create({
-        publicKey: publicKeyCredentialCreationOptions
-      }) as any;
-
-      if (credential) {
-        // 3. Verify with server
-        const flatId = user.email?.split('@')[0] || '';
-        const verifyRes = await fetch("/api/auth/register/verify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            email: user.email,
-            flatId,
-            attestationResponse: {
-              id: credential.id,
-              rawId: btoa(String.fromCharCode(...new Uint8Array(credential.rawId))),
-              response: {
-                attestationObject: btoa(String.fromCharCode(...new Uint8Array(credential.response.attestationObject))),
-                clientDataJSON: btoa(String.fromCharCode(...new Uint8Array(credential.response.clientDataJSON)))
-              }
-            }
-          })
-        });
-
-        if (!verifyRes.ok) throw new Error("Failed to verify passkey registration");
-
-        setHasPasskey(true);
-        setSuccess('Passkey added successfully!');
-        setTimeout(() => setSuccess(''), 3000);
-      }
-    } catch (err: any) {
-      console.error(err);
-      if (err.name === 'NotAllowedError' || err.message.includes('Permissions Policy')) {
-        setError('Passkeys are restricted in this preview window. Please open the app in a new tab to add a passkey.');
-      } else {
-        setError('Failed to add passkey: ' + (err.message || 'Unknown error'));
-      }
     }
   };
 
@@ -238,29 +166,6 @@ export function Profile() {
                   <p className="text-xs text-[#5A5A40]/60 mt-2">
                     Note: You may need to sign out and sign back in to change your password for security reasons.
                   </p>
-                </div>
-
-                <div className="pt-4">
-                  <label className="block text-xs uppercase tracking-widest text-[#5A5A40] mb-2 font-medium">Passkey Authentication</label>
-                  <div className="flex items-center justify-between bg-[#F5F5F0] p-4 rounded-2xl">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
-                        <Fingerprint className="w-5 h-5 text-[#5A5A40]" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-[#1A1A1A]">Sign in with Passkey</p>
-                        <p className="text-xs text-[#5A5A40]/60">Use your device's fingerprint, face, or screen lock</p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleAddPasskey}
-                      disabled={hasPasskey}
-                      className="px-4 py-2 bg-white text-[#5A5A40] text-sm font-bold uppercase tracking-widest rounded-full shadow-sm hover:bg-black/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-black/5"
-                    >
-                      {hasPasskey ? 'Added' : 'Add'}
-                    </button>
-                  </div>
                 </div>
               </div>
             </div>
