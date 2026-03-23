@@ -812,27 +812,27 @@ function Dashboard() {
           )}
         </div>
 
-        <div className="flex justify-center">
-
         {notices.length > 0 && (
-          <div className="bg-white p-6 rounded-[32px] shadow-sm border border-[#5A5A40]/10 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-1 h-full bg-[#5A5A40]" />
-            <h3 className="text-xl font-serif mb-4 flex items-center gap-2">
-              <AlertCircle className="w-5 h-5 text-[#5A5A40]" />
-              Building Notices
-            </h3>
-            <div className="space-y-4">
-              {notices.map((notice) => (
-                <div key={notice.id} className="p-4 bg-[#F5F5F0] rounded-2xl">
-                  <div className="flex justify-between items-start mb-2">
-                    <h4 className="font-medium text-[#1A1A1A]">{notice.title}</h4>
-                    <span className="text-[10px] uppercase tracking-widest font-bold text-[#5A5A40]/40">
-                      {notice.createdAt?.toDate ? notice.createdAt.toDate().toLocaleDateString() : 'Just now'}
-                    </span>
+          <div className="flex justify-center mb-8">
+            <div className="bg-white p-6 rounded-[32px] shadow-sm border border-[#5A5A40]/10 relative overflow-hidden w-full max-w-2xl">
+              <div className="absolute top-0 left-0 w-1 h-full bg-[#5A5A40]" />
+              <h3 className="text-xl font-serif mb-4 flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-[#5A5A40]" />
+                Building Notices
+              </h3>
+              <div className="space-y-4">
+                {notices.map((notice) => (
+                  <div key={notice.id} className="p-4 bg-[#F5F5F0] rounded-2xl">
+                    <div className="flex justify-between items-start mb-2">
+                      <h4 className="font-medium text-[#1A1A1A]">{notice.title}</h4>
+                      <span className="text-[10px] uppercase tracking-widest font-bold text-[#5A5A40]/40">
+                        {notice.createdAt?.toDate ? notice.createdAt.toDate().toLocaleDateString() : 'Just now'}
+                      </span>
+                    </div>
+                    <p className="text-sm text-[#5A5A40]/80 whitespace-pre-wrap">{notice.content}</p>
                   </div>
-                  <p className="text-sm text-[#5A5A40]/80 whitespace-pre-wrap">{notice.content}</p>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
         )}
@@ -996,7 +996,6 @@ function Dashboard() {
               </AnimatePresence>
             </div>
           </div>
-          </div>
 
           {/* Charts Sidebar */}
           <div className="space-y-6">
@@ -1133,7 +1132,9 @@ function Dashboard() {
             <div className="mt-4">
               <InstallPWA />
             </div>
-          </main>
+          </div>
+        </div>
+      </main>
 
       <footer className="max-w-5xl mx-auto px-4 py-8 border-t border-black/5 mt-8 text-center">
         <p className="text-sm font-serif text-[#5A5A40] mb-4">Made by Manthan - F602</p>
