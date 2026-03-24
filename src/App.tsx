@@ -15,7 +15,9 @@ import {
   deleteDoc,
   updateDoc,
   increment,
-  where
+  where,
+  getDocs,
+  limit
 } from 'firebase/firestore';
 import { 
   signInWithEmailAndPassword, 
@@ -168,8 +170,8 @@ function Dashboard() {
 
   const years = useMemo(() => {
     const uniqueYears = new Set<number>();
-    transactions.forEach(t => {
-      const y = t.date?.toDate().getFullYear();
+    transactions.forEach(tx => {
+      const y = tx.date?.toDate().getFullYear();
       if (typeof y === 'number') uniqueYears.add(y);
     });
     uniqueYears.add(new Date().getFullYear());
@@ -181,7 +183,7 @@ function Dashboard() {
     async function testConnection() {
       try {
         await getDocFromServer(doc(db, 'test', 'connection'));
-      } catch (error) {
+      } catch (error: any) {
         if (error instanceof Error && error.message.includes('the client is offline')) {
           console.error("Please check your Firebase configuration.");
           setConnectionError("Firestore is offline. Please check your Firebase configuration.");
@@ -191,27 +193,9 @@ function Dashboard() {
     testConnection();
   }, []);
 
-  // Initialize Default Categories
-  useEffect(() => {
-    const initCategories = async () => {
-      const defaultCategories = [
-        { id: 'plumbing', name: 'Plumbing' },
-        { id: 'wiring', name: 'Wiring' },
-        { id: 'maintenance', name: 'Maintenance' },
-        { id: 'security', name: 'Security' },
-        { id: 'cleaning', name: 'Cleaning' },
-        { id: 'others', name: 'Others' }
-      ];
-      
-      try {
-        const q = query(collection(db, 'categories'));
-        const snap = await getDocFromServer(doc(db, 'test', 'check')); // Dummy check
-        // We'll just check if the collection is empty in the onSnapshot below
-      } catch (e) {}
-    };
-    initCategories();
-  }, []);
 
+
+  // Fetch Categories
   useEffect(() => {
     const q = query(collection(db, 'categories'), orderBy('name', 'asc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -229,12 +213,45 @@ function Dashboard() {
       } else {
         setCategories(data);
       }
+    }, (error: any) => {
+      handleFirestoreError(error, OperationType.GET, 'categories');
     });
     return () => unsubscribe();
   }, []);
 
+  // Seed Categories if empty and user is admin
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (u) => {
+    const seedIfEmpty = async () => {
+      if (flatInfo?.role === 'admin') {
+        try {
+          const q = query(collection(db, 'categories'), limit(1));
+          const snap = await getDocs(q);
+          if (snap.empty) {
+            const defaultCategories = [
+              { name: 'Plumbing', type: 'expense' },
+              { name: 'Wiring', type: 'expense' },
+              { name: 'Maintenance', type: 'expense' },
+              { name: 'Security', type: 'expense' },
+              { name: 'Cleaning', type: 'expense' },
+              { name: 'Others', type: 'expense' },
+              { name: 'Salary', type: 'income' },
+              { name: 'Rent', type: 'income' },
+              { name: 'Maintenance Collection', type: 'income' }
+            ];
+            for (const cat of defaultCategories) {
+              await addDoc(collection(db, 'categories'), cat);
+            }
+          }
+        } catch (error: any) {
+          console.error("Error seeding categories:", error);
+        }
+      }
+    };
+    seedIfEmpty();
+  }, [flatInfo]);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (u: User | null) => {
       try {
         setUser(u);
         if (u) {
@@ -247,7 +264,7 @@ function Dashboard() {
         } else {
           setFlatInfo(null);
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error("Auth state error:", err);
       } finally {
         setLoading(false);
@@ -425,16 +442,16 @@ function Dashboard() {
     if (type === 'monthly') {
       const start = startOfMonth(new Date(year, month));
       const end = endOfMonth(start);
-      filtered = transactions.filter(t => {
-        const d = t.date?.toDate();
+      filtered = transactions.filter(tx => {
+        const d = tx.date?.toDate();
         return d && d >= start && d <= end;
       });
       title += ` (${format(start, 'MMMM yyyy')})`;
     } else {
       const start = startOfYear(new Date(year, 0));
       const end = endOfYear(start);
-      filtered = transactions.filter(t => {
-        const d = t.date?.toDate();
+      filtered = transactions.filter(tx => {
+        const d = tx.date?.toDate();
         return d && d >= start && d <= end;
       });
       title += ` (Year ${year})`;
@@ -446,20 +463,20 @@ function Dashboard() {
     doc.setTextColor(100);
     doc.text(`${t('pdf.generatedOn')}: ${format(new Date(), 'PPP p')}`, 14, 30);
     
-    const periodIncome = filtered.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0);
-    const periodExpense = filtered.filter(t => t.type === 'expense').reduce((acc, t) => acc + t.amount, 0);
+    const periodIncome = filtered.filter(tx => tx.type === 'income').reduce((acc, tx) => acc + tx.amount, 0);
+    const periodExpense = filtered.filter(tx => tx.type === 'expense').reduce((acc, tx) => acc + tx.amount, 0);
     
     doc.text(`${t('pdf.totalIncome')}: Rs. ${periodIncome.toLocaleString()}`, 14, 38);
     doc.text(`${t('pdf.totalExpense')}: Rs. ${periodExpense.toLocaleString()}`, 14, 44);
     doc.text(`${t('pdf.netBalance')}: Rs. ${(periodIncome - periodExpense).toLocaleString()}`, 14, 50);
 
-    const tableData = filtered.map(t => [
-      t.date ? format(t.date.toDate(), 'MMM d, yyyy') : t('pdf.pending'),
-      t.type.toUpperCase(),
-      t.category,
-      t.description || '-',
-      `Rs. ${t.amount.toLocaleString()}`,
-      t.createdBy
+    const tableData = filtered.map(tx => [
+      tx.date ? format(tx.date.toDate(), 'MMM d, yyyy') : t('pdf.pending'),
+      tx.type.toUpperCase(),
+      tx.category,
+      tx.description || '-',
+      `Rs. ${tx.amount.toLocaleString()}`,
+      tx.createdBy
     ]);
 
     autoTable(doc, {
@@ -524,17 +541,17 @@ function Dashboard() {
     if (timeRange === 'monthly') {
       const start = startOfMonth(new Date(selectedYear, selectedMonth));
       const end = endOfMonth(start);
-      const filtered = transactions.filter(t => {
-        const d = t.date?.toDate();
+      const filtered = transactions.filter(tx => {
+        const d = tx.date?.toDate();
         return d && d >= start && d <= end;
       });
 
       if (chartView === 'pie') {
         // Expenses by category
-        const expenses = filtered.filter(t => t.type === 'expense');
+        const expenses = filtered.filter(tx => tx.type === 'expense');
         const data: { name: string; value: number }[] = [];
         CATEGORIES.forEach(cat => {
-          const total = expenses.filter(t => t.category === cat.name).reduce((acc, t) => acc + t.amount, 0);
+          const total = expenses.filter(tx => tx.category === cat.name).reduce((acc, tx) => acc + tx.amount, 0);
           if (total > 0) data.push({ name: cat.name, value: total });
         });
         return data;
@@ -542,27 +559,27 @@ function Dashboard() {
         // Daily Income vs Expense
         const days = eachDayOfInterval({ start, end });
         return days.map(day => {
-          const dayTransactions = filtered.filter(t => isSameDay(t.date?.toDate(), day));
+          const dayTransactions = filtered.filter(tx => isSameDay(tx.date?.toDate(), day));
           return {
             name: format(day, 'd'),
-            income: dayTransactions.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0),
-            expense: dayTransactions.filter(t => t.type === 'expense').reduce((acc, t) => acc + t.amount, 0),
+            income: dayTransactions.filter(tx => tx.type === 'income').reduce((acc, tx) => acc + tx.amount, 0),
+            expense: dayTransactions.filter(tx => tx.type === 'expense').reduce((acc, tx) => acc + tx.amount, 0),
           };
         });
       }
     } else {
       const start = startOfYear(new Date(selectedYear, 0));
       const end = endOfYear(start);
-      const filtered = transactions.filter(t => {
-        const d = t.date?.toDate();
+      const filtered = transactions.filter(tx => {
+        const d = tx.date?.toDate();
         return d && d >= start && d <= end;
       });
 
       if (chartView === 'pie') {
-        const expenses = filtered.filter(t => t.type === 'expense');
+        const expenses = filtered.filter(tx => tx.type === 'expense');
         const data: { name: string; value: number }[] = [];
         CATEGORIES.forEach(cat => {
-          const total = expenses.filter(t => t.category === cat.name).reduce((acc, t) => acc + t.amount, 0);
+          const total = expenses.filter(tx => tx.category === cat.name).reduce((acc, tx) => acc + tx.amount, 0);
           if (total > 0) data.push({ name: cat.name, value: total });
         });
         return data;
@@ -570,11 +587,11 @@ function Dashboard() {
         // Monthly Income vs Expense
         const months = eachMonthOfInterval({ start, end });
         return months.map(month => {
-          const monthTransactions = filtered.filter(t => isSameMonth(t.date?.toDate(), month));
+          const monthTransactions = filtered.filter(tx => isSameMonth(tx.date?.toDate(), month));
           return {
             name: format(month, 'MMM'),
-            income: monthTransactions.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0),
-            expense: monthTransactions.filter(t => t.type === 'expense').reduce((acc, t) => acc + t.amount, 0),
+            income: monthTransactions.filter(tx => tx.type === 'income').reduce((acc, tx) => acc + tx.amount, 0),
+            expense: monthTransactions.filter(tx => tx.type === 'expense').reduce((acc, tx) => acc + tx.amount, 0),
           };
         });
       }
@@ -788,8 +805,8 @@ function Dashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Notices Section - MOVED AND HIGHLIGHTED */}
-            <div className="space-y-4">
+            {/* Building Notices - MOVED HERE */}
+            <div className="space-y-4 pt-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-xl font-serif flex items-center gap-2">
                   <Bell className="w-5 h-5 text-[#5A5A40]" />
@@ -808,7 +825,7 @@ function Dashboard() {
                 )}
               </div>
               
-              <div className="grid grid-cols-1 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {notices.map((notice) => (
                   <motion.div 
                     key={notice.id}
@@ -865,7 +882,7 @@ function Dashboard() {
                   </motion.div>
                 ))}
                 {notices.length === 0 && (
-                  <div className="text-center py-12 bg-white rounded-[32px] border border-dashed border-[#5A5A40]/20">
+                  <div className="col-span-full text-center py-12 bg-white rounded-[32px] border border-dashed border-[#5A5A40]/20">
                     <p className="text-[#5A5A40]/40 font-serif italic">No notices at the moment.</p>
                   </div>
                 )}
@@ -1099,7 +1116,7 @@ function Dashboard() {
                   {chartView === 'pie' ? (
                     <PieChart>
                       <Pie
-                        data={chartData}
+                        data={chartData as any[]}
                         cx="50%"
                         cy="50%"
                         innerRadius={60}
@@ -1107,7 +1124,7 @@ function Dashboard() {
                         paddingAngle={5}
                         dataKey="value"
                       >
-                        {chartData.map((_, index) => (
+                        {(chartData as any[]).map((_, index) => (
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
@@ -1117,7 +1134,7 @@ function Dashboard() {
                       <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px' }} />
                     </PieChart>
                   ) : (
-                    <LineChart data={chartData}>
+                    <LineChart data={chartData as any[]}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F0F0F0" />
                       <XAxis 
                         dataKey="name" 
@@ -1679,7 +1696,7 @@ interface ErrorBoundaryState {
   error: any;
 }
 
-class ErrorBoundary extends (Component as any) {
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false, error: null };
@@ -1715,7 +1732,7 @@ class ErrorBoundary extends (Component as any) {
       );
     }
 
-    return (this.props as any).children;
+    return this.props.children;
   }
 }
 

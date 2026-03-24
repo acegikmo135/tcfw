@@ -46,7 +46,7 @@ export function CommentsModal({ transactionId, transactionTitle, currentUserFlat
       })) as Comment[];
       setComments(data);
       setLoading(false);
-    }, (error) => {
+    }, (error: any) => {
       handleFirestoreError(error, OperationType.GET, `transactions/${transactionId}/comments`);
       setLoading(false);
     });
@@ -81,10 +81,10 @@ export function CommentsModal({ transactionId, transactionTitle, currentUserFlat
           message: `${currentUserFlatNo}: ${newComment.trim().substring(0, 50)}${newComment.trim().length > 50 ? '...' : ''}`,
           url: window.location.origin
         })
-      }).catch(err => console.error("Notification error:", err));
+      }).catch((err: any) => console.error("Notification error:", err));
 
       setNewComment('');
-    } catch (error) {
+    } catch (error: any) {
       handleFirestoreError(error, OperationType.WRITE, `transactions/${transactionId}/comments`);
     } finally {
       setSubmitting(false);
@@ -99,7 +99,7 @@ export function CommentsModal({ transactionId, transactionTitle, currentUserFlat
       await updateDoc(doc(db, 'transactions', transactionId), {
         commentCount: increment(-1)
       });
-    } catch (error) {
+    } catch (error: any) {
       handleFirestoreError(error, OperationType.DELETE, `transactions/${transactionId}/comments/${commentId}`);
     }
   };

@@ -73,11 +73,12 @@ export function AdminPanel() {
   const [addError, setAddError] = useState("");
   const [noticeError, setNoticeError] = useState("");
   const [categoryError, setCategoryError] = useState("");
+  const [isSeeding, setIsSeeding] = useState(false);
 
   const { t, language, setLanguage } = useLanguage();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (u) => {
+    const unsubscribe = onAuthStateChanged(auth, async (u: User | null) => {
       setUser(u);
       if (u && u.email) {
         if (u.email === 'manthankansagra@gmail.com' || u.email === 'admin@building.local') {
@@ -89,7 +90,7 @@ export function AdminPanel() {
             if (docSnap.exists() && docSnap.data().role === 'admin') {
               setIsAuthorized(true);
             }
-          } catch (err) {
+          } catch (err: any) {
             console.error("Error checking admin status:", err);
           }
         }
@@ -108,7 +109,7 @@ export function AdminPanel() {
       })) as Flat[];
       setFlats(data);
       setLoading(false);
-    }, (error) => {
+    }, (error: any) => {
       handleFirestoreError(error, OperationType.GET, 'flats');
     });
 
@@ -119,14 +120,14 @@ export function AdminPanel() {
         ...doc.data()
       })) as Notice[];
       setNotices(data);
-    }, (error) => {
+    }, (error: any) => {
       handleFirestoreError(error, OperationType.GET, 'notices');
     });
 
     const qCategories = query(collection(db, 'categories'), orderBy('name', 'asc'));
     const unsubscribeCategories = onSnapshot(qCategories, (snapshot) => {
       setCategories(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => {
+    }, (error: any) => {
       handleFirestoreError(error, OperationType.GET, 'categories');
     });
 
@@ -141,7 +142,7 @@ export function AdminPanel() {
     const newRole = flat.role === 'admin' ? 'resident' : 'admin';
     try {
       await setDoc(doc(db, 'flats', flat.id), { ...flat, role: newRole }, { merge: true });
-    } catch (error) {
+    } catch (error: any) {
       handleFirestoreError(error, OperationType.UPDATE, `flats/${flat.id}`);
     }
   };
@@ -150,7 +151,7 @@ export function AdminPanel() {
     if (window.confirm(t('admin.deleteConfirm').replace('{id}', id))) {
       try {
         await deleteDoc(doc(db, 'flats', id));
-      } catch (error) {
+      } catch (error: any) {
         handleFirestoreError(error, OperationType.DELETE, `flats/${id}`);
       }
     }
@@ -210,7 +211,7 @@ export function AdminPanel() {
         role
       });
       setIsAdding(false);
-    } catch (error) {
+    } catch (error: any) {
       handleFirestoreError(error, OperationType.CREATE, `flats/${flatNo.toLowerCase()}`);
     }
   };
@@ -249,7 +250,7 @@ export function AdminPanel() {
       }).catch(err => console.error("Notification error:", err));
 
       setIsAddingNotice(false);
-    } catch (error) {
+    } catch (error: any) {
       handleFirestoreError(error, OperationType.CREATE, 'notices');
     }
   };
@@ -258,7 +259,7 @@ export function AdminPanel() {
     if (window.confirm("Are you sure you want to delete this notice?")) {
       try {
         await deleteDoc(doc(db, 'notices', id));
-      } catch (error) {
+      } catch (error: any) {
         handleFirestoreError(error, OperationType.DELETE, `notices/${id}`);
       }
     }
@@ -280,7 +281,7 @@ export function AdminPanel() {
       });
       setNewCategory({ name: '', type: 'expense' });
       setIsAddingCategory(false);
-    } catch (error) {
+    } catch (error: any) {
       handleFirestoreError(error, OperationType.CREATE, 'categories');
     }
   };
@@ -289,9 +290,40 @@ export function AdminPanel() {
     if (window.confirm("Are you sure you want to delete this category?")) {
       try {
         await deleteDoc(doc(db, 'categories', id));
-      } catch (error) {
+      } catch (error: any) {
         handleFirestoreError(error, OperationType.DELETE, `categories/${id}`);
       }
+    }
+  };
+
+  const seedCategories = async () => {
+    setIsSeeding(true);
+    const defaultCategories = [
+      { name: 'Plumbing', type: 'expense' },
+      { name: 'Wiring', type: 'expense' },
+      { name: 'Maintenance', type: 'expense' },
+      { name: 'Security', type: 'expense' },
+      { name: 'Cleaning', type: 'expense' },
+      { name: 'Others', type: 'expense' },
+      { name: 'Salary', type: 'income' },
+      { name: 'Rent', type: 'income' },
+      { name: 'Maintenance Collection', type: 'income' }
+    ];
+
+    try {
+      const { addDoc, collection } = await import('firebase/firestore');
+      for (const cat of defaultCategories) {
+        // Check if exists
+        const exists = categories.some(c => c.name === cat.name && c.type === cat.type);
+        if (!exists) {
+          await addDoc(collection(db, 'categories'), cat);
+        }
+      }
+      alert("Default categories seeded successfully!");
+    } catch (error: any) {
+      handleFirestoreError(error, OperationType.CREATE, 'categories');
+    } finally {
+      setIsSeeding(false);
     }
   };
 
@@ -482,13 +514,23 @@ export function AdminPanel() {
             <h2 className="text-3xl font-serif">Categories</h2>
             <p className="text-[#5A5A40]/60 text-sm">Manage income and expense categories</p>
           </div>
-          <button 
-            onClick={() => setIsAddingCategory(true)}
-            className="bg-[#5A5A40] text-white px-6 py-3 rounded-full font-medium flex items-center gap-2 hover:bg-[#4A4A30] transition-all shadow-lg shadow-[#5A5A40]/20"
-          >
-            <Plus className="w-5 h-5" />
-            <span className="hidden sm:inline">Add Category</span>
-          </button>
+          <div className="flex gap-3">
+            <button 
+              onClick={seedCategories}
+              disabled={isSeeding}
+              className="bg-white border border-[#5A5A40]/20 text-[#5A5A40] px-6 py-3 rounded-full font-medium flex items-center gap-2 hover:bg-[#F5F5F0] transition-all disabled:opacity-50"
+            >
+              {isSeeding ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
+              <span className="hidden sm:inline">Seed Defaults</span>
+            </button>
+            <button 
+              onClick={() => setIsAddingCategory(true)}
+              className="bg-[#5A5A40] text-white px-6 py-3 rounded-full font-medium flex items-center gap-2 hover:bg-[#4A4A30] transition-all shadow-lg shadow-[#5A5A40]/20"
+            >
+              <Plus className="w-5 h-5" />
+              <span className="hidden sm:inline">Add Category</span>
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

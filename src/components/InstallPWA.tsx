@@ -12,7 +12,11 @@ interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
 }
 
-export function InstallPWA() {
+interface InstallPWAProps {
+  alwaysShow?: boolean;
+}
+
+export function InstallPWA({ alwaysShow = false }: InstallPWAProps) {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstallable, setIsInstallable] = useState(false);
   const { t } = useLanguage();
@@ -56,7 +60,9 @@ export function InstallPWA() {
     setIsInstallable(false);
   };
 
-  if (!isInstallable || location.pathname !== '/adminpanel') {
+  const shouldShow = alwaysShow || (isInstallable && location.pathname === '/adminpanel');
+
+  if (!shouldShow) {
     return null;
   }
 
