@@ -263,7 +263,6 @@ export function AdminPanel() {
     }
 
     try {
-      const { addDoc, collection } = await import('firebase/firestore');
       await addDoc(collection(db, 'categories'), {
         name: newCategory.name.trim(),
         type: newCategory.type
@@ -300,7 +299,6 @@ export function AdminPanel() {
     ];
 
     try {
-      const { addDoc, collection } = await import('firebase/firestore');
       for (const cat of defaultCategories) {
         // Check if exists
         const exists = categories.some(c => c.name === cat.name && c.type === cat.type);
@@ -524,43 +522,44 @@ export function AdminPanel() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <AnimatePresence mode="popLayout">
-            {categories.map((category) => (
-              <motion.div 
-                key={category.id}
-                layout
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                className="bg-white p-6 rounded-[32px] shadow-sm border border-black/5 flex items-center justify-between group hover:shadow-md transition-all"
-              >
-                <div className="flex items-center gap-4">
-                  <div className={cn(
-                    "w-10 h-10 rounded-xl flex items-center justify-center",
-                    category.type === 'income' ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
-                  )}>
-                    {category.type === 'income' ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-[#1A1A1A]">{category.name}</h3>
-                    <p className="text-[10px] uppercase tracking-widest font-bold text-[#5A5A40]/40">
-                      {category.type}
-                    </p>
-                  </div>
-                </div>
-                <button 
-                  onClick={() => deleteCategory(category.id)}
-                  className="p-2 text-rose-500/20 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
+            {categories.length > 0 ? (
+              categories.map((category) => (
+                <motion.div 
+                  key={category.id}
+                  layout
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  className="bg-white p-6 rounded-[32px] shadow-sm border border-black/5 flex items-center justify-between group hover:shadow-md transition-all"
                 >
-                  <Trash2 className="w-5 h-5" />
-                </button>
-              </motion.div>
-            ))}
+                  <div className="flex items-center gap-4">
+                    <div className={cn(
+                      "w-10 h-10 rounded-xl flex items-center justify-center",
+                      category.type === 'income' ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
+                    )}>
+                      {category.type === 'income' ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-[#1A1A1A]">{category.name}</h3>
+                      <p className="text-[10px] uppercase tracking-widest font-bold text-[#5A5A40]/40">
+                        {category.type}
+                      </p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => deleteCategory(category.id)}
+                    className="p-2 text-rose-500/20 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                </motion.div>
+              ))
+            ) : (
+              <div className="col-span-full py-12 text-center bg-white rounded-[32px] border border-dashed border-[#5A5A40]/20">
+                <p className="text-[#5A5A40]/40 font-medium">No categories found. Click "Seed Defaults" to get started.</p>
+              </div>
+            )}
           </AnimatePresence>
-          {categories.length === 0 && (
-            <div className="col-span-full py-12 text-center text-[#5A5A40]/40">
-              No categories found.
-            </div>
-          )}
         </div>
       </main>
 

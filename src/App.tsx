@@ -195,6 +195,8 @@ function Dashboard() {
 
 
 
+  const isAdmin = flatInfo?.role === 'admin' || user?.email === 'manthankansagra@gmail.com';
+
   // Fetch Categories
   useEffect(() => {
     const q = query(collection(db, 'categories'), orderBy('name', 'asc'));
@@ -204,15 +206,7 @@ function Dashboard() {
         name: doc.data().name,
         type: doc.data().type
       }));
-      if (data.length === 0) {
-        setCategories([
-          ...CATEGORIES.map(c => ({ id: c.id, name: c.name, type: 'expense' })),
-          { id: 'salary', name: 'Salary', type: 'income' },
-          { id: 'rent', name: 'Rent', type: 'income' }
-        ]);
-      } else {
-        setCategories(data);
-      }
+      setCategories(data);
     }, (error: any) => {
       handleFirestoreError(error, OperationType.GET, 'categories');
     });
@@ -222,11 +216,12 @@ function Dashboard() {
   // Seed Categories if empty and user is admin
   useEffect(() => {
     const seedIfEmpty = async () => {
-      if (flatInfo?.role === 'admin') {
+      if (isAdmin && user) {
         try {
           const q = query(collection(db, 'categories'), limit(1));
           const snap = await getDocs(q);
           if (snap.empty) {
+            console.log("Seeding default categories...");
             const defaultCategories = [
               { name: 'Plumbing', type: 'expense' },
               { name: 'Wiring', type: 'expense' },
@@ -248,7 +243,7 @@ function Dashboard() {
       }
     };
     seedIfEmpty();
-  }, [flatInfo]);
+  }, [isAdmin, user]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u: User | null) => {
@@ -272,8 +267,6 @@ function Dashboard() {
     });
     return () => unsubscribe();
   }, []);
-
-  const isAdmin = flatInfo?.role === 'admin' || user?.email === 'manthankansagra@gmail.com';
 
   // Transactions Listener
   useEffect(() => {
