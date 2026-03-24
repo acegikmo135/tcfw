@@ -1,8 +1,8 @@
 {
-  "name": "The Courtyard F Wing",
+  "name": "Courtyard F",
   "short_name": "Courtyard F",
   "description": "Transparent Fund Management",
-  "theme_color": "#5A5A40",
+  "theme_color": "#F5F5F0",
   "background_color": "#F5F5F0",
   "display": "standalone",
   "start_url": "/",

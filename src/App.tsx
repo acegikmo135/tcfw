@@ -601,7 +601,7 @@ function Dashboard() {
             <div className="w-16 h-16 bg-[#5A5A40] rounded-full flex items-center justify-center mb-4 overflow-hidden">
               <img src="https://raw.githubusercontent.com/acegikmo135/assets/main/vbub4efh.jpg" alt="Logo" className="w-full h-full object-cover" />
             </div>
-            <h1 className="text-3xl font-serif text-[#1A1A1A]">{t('app.title')}</h1>
+            <h1 className="text-3xl font-serif text-[#1A1A1A] text-center whitespace-nowrap">{t('app.title')}</h1>
             <p className="text-[#5A5A40]/60 font-serif italic text-center">{t('app.subtitle')}</p>
           </div>
 
@@ -699,7 +699,7 @@ function Dashboard() {
               <img src="https://raw.githubusercontent.com/acegikmo135/assets/main/vbub4efh.jpg" alt="Logo" className="w-full h-full object-cover" />
             </div>
             <div>
-              <h2 className="font-serif text-lg leading-tight">{t('app.title')}</h2>
+              <h2 className="font-serif text-lg leading-tight">Welcome {flatInfo?.flatNo}!</h2>
               <p className="text-xs text-[#5A5A40]/60 font-medium uppercase tracking-widest">
                 {t('login.flatNo')} {flatInfo?.flatNo} • {flatInfo?.role === 'admin' ? t('admin.admin') : t('admin.resident')}
               </p>

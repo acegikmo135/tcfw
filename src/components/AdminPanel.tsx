@@ -150,9 +150,23 @@ export function AdminPanel() {
   const deleteFlat = async (id: string) => {
     if (window.confirm(t('admin.deleteConfirm').replace('{id}', id))) {
       try {
+        // Delete flat document
         await deleteDoc(doc(db, 'flats', id));
+        // Note: Full deletion from Auth requires admin SDK, which is not available in client-side.
+        // This will only remove the flat from the database.
       } catch (error: any) {
         handleFirestoreError(error, OperationType.DELETE, `flats/${id}`);
+      }
+    }
+  };
+
+  const clearAllData = async () => {
+    if (window.confirm("Are you sure you want to clear ALL data? This cannot be undone.")) {
+      try {
+        // This is a placeholder as we cannot delete all collections from client-side safely
+        alert("Data clearing is not supported from the client-side for security reasons.");
+      } catch (error: any) {
+        console.error("Error clearing data:", error);
       }
     }
   };
@@ -453,6 +467,22 @@ export function AdminPanel() {
             </AnimatePresence>
           </div>
         )}
+
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 mt-12 border-t border-black/5 pt-12">
+          <div>
+            <h2 className="text-3xl font-serif">System</h2>
+            <p className="text-[#5A5A40]/60 text-sm">System management</p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button 
+              onClick={clearAllData}
+              className="bg-rose-50 text-rose-600 px-6 py-3 rounded-full font-medium flex items-center justify-center gap-2 hover:bg-rose-100 transition-all"
+            >
+              <Trash2 className="w-5 h-5" />
+              <span>Clear All Data</span>
+            </button>
+          </div>
+        </div>
 
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 mt-12 border-t border-black/5 pt-12">
           <div>

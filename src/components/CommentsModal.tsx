@@ -155,15 +155,15 @@ export function CommentsModal({ transactionId, transactionTitle, currentUserFlat
                   )}
                 >
                   <div className="flex items-baseline gap-2 mb-1 px-1">
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-[#5A5A40]/60">
+                    <span className="text-[9px] font-bold uppercase tracking-widest text-[#5A5A40]/60">
                       {comment.createdBy}
                     </span>
                     {isAdmin && (
-                      <span className="text-[8px] font-bold uppercase tracking-widest text-white bg-[#5A5A40] px-1.5 py-0.5 rounded">
+                      <span className="text-[7px] font-bold uppercase tracking-widest text-white bg-[#5A5A40] px-1 py-0.5 rounded">
                         Admin
                       </span>
                     )}
-                    <span className="text-[10px] text-[#5A5A40]/40">
+                    <span className="text-[9px] text-[#5A5A40]/40">
                       {comment.createdAt?.toDate ? format(comment.createdAt.toDate(), 'MMM d, h:mm a') : 'Just now'}
                     </span>
                   </div>

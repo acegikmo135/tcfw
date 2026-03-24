@@ -11,7 +11,7 @@ interface LanguageContextType {
 const translations = {
   en: {
     // General
-    "app.title": "The Courtyard F wing",
+    "app.title": "Courtyard F",
     "app.subtitle": "Transparent Fund Management",
     "cancel": "Cancel",
     "save": "Save",
