@@ -81,7 +81,7 @@ export function AdminPanel() {
     const unsubscribe = onAuthStateChanged(auth, async (u: User | null) => {
       setUser(u);
       if (u && u.email) {
-        if (u.email === 'manthankansagra@gmail.com' || u.email === 'admin@building.local') {
+        if (u.email === 'manthankansagra@gmail.com' || u.email === 'admin@building.local' || u.email === 'f602@building.local') {
           setIsAuthorized(true);
         } else {
           try {

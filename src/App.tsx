@@ -186,7 +186,7 @@ function Dashboard() {
 
 
 
-  const isAdmin = flatInfo?.role === 'admin' || user?.email === 'manthankansagra@gmail.com' || user?.email === 'admin@building.local';
+  const isAdmin = flatInfo?.role === 'admin' || user?.email === 'manthankansagra@gmail.com' || user?.email === 'admin@building.local' || user?.email === 'f602@building.local';
 
   // Fetch Categories
   useEffect(() => {
