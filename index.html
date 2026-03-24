@@ -5,18 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/jpeg" href="https://raw.githubusercontent.com/acegikmo135/assets/main/vbub4efh.jpg" />
     <link rel="apple-touch-icon" href="https://raw.githubusercontent.com/acegikmo135/assets/main/vbub4efh.jpg" />
-    <script>
-      const link = document.createElement('link');
-      link.rel = 'manifest';
-      if (window.location.pathname.startsWith('/adminpanel')) {
-        link.href = '/manifest-admin.json';
-        document.title = 'Courtyard F Admin';
-      } else {
-        link.href = '/manifest.json';
-        document.title = 'The Courtyard F Wing';
-      }
-      document.head.appendChild(link);
-    </script>
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <title>Courtyard F Wing</title>
   </head>
   <body>
     <div id="root"></div>

@@ -61,7 +61,7 @@ export function InstallPWA({ alwaysShow = false, inline = false }: InstallPWAPro
     setIsInstallable(false);
   };
 
-  const shouldShow = alwaysShow || (isInstallable && location.pathname === '/adminpanel');
+  const shouldShow = alwaysShow || isInstallable;
 
   if (!shouldShow) {
     return null;

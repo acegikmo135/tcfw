@@ -10,7 +10,6 @@ export default defineConfig(({mode}) => {
       react(), 
       VitePWA({
         registerType: 'autoUpdate',
-        injectRegister: false,
         devOptions: {
           enabled: true
         },
@@ -21,7 +20,7 @@ export default defineConfig(({mode}) => {
           theme_color: '#1d4ed8',
           background_color: '#F5F5F0',
           display: 'standalone',
-          start_url: '/adminpanel',
+          start_url: '/',
           icons: [
             {
               src: 'https://raw.githubusercontent.com/acegikmo135/assets/main/vbub4efh.jpg',

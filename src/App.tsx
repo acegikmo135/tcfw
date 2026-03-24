@@ -116,15 +116,6 @@ interface Notice {
   isPinned?: boolean;
 }
 
-const CATEGORIES = [
-  { id: 'plumbing', name: 'Plumbing', icon: Wrench },
-  { id: 'wiring', name: 'Wiring', icon: Zap },
-  { id: 'maintenance', name: 'Maintenance', icon: Building2 },
-  { id: 'security', name: 'Security', icon: Shield },
-  { id: 'cleaning', name: 'Cleaning', icon: Building2 },
-  { id: 'others', name: 'Others', icon: PlusCircle },
-];
-
 const PREDEFINED_USERS = [
   { flatNo: 'F602', password: '12345678', role: 'admin' },
   { flatNo: 'F601', password: '12345678', role: 'resident' },
@@ -195,7 +186,7 @@ function Dashboard() {
 
 
 
-  const isAdmin = flatInfo?.role === 'admin' || user?.email === 'manthankansagra@gmail.com';
+  const isAdmin = flatInfo?.role === 'admin' || user?.email === 'manthankansagra@gmail.com' || user?.email === 'admin@building.local';
 
   // Fetch Categories
   useEffect(() => {
@@ -206,6 +197,7 @@ function Dashboard() {
         name: doc.data().name,
         type: doc.data().type
       }));
+      console.log("Fetched categories:", data.length);
       setCategories(data);
     }, (error: any) => {
       handleFirestoreError(error, OperationType.GET, 'categories');
@@ -229,13 +221,15 @@ function Dashboard() {
               { name: 'Security', type: 'expense' },
               { name: 'Cleaning', type: 'expense' },
               { name: 'Others', type: 'expense' },
-              { name: 'Salary', type: 'income' },
+              { name: 'Salary', type: 'expense' },
               { name: 'Rent', type: 'income' },
-              { name: 'Maintenance Collection', type: 'income' }
+              { name: 'Maintenance Collection', type: 'income' },
             ];
+
             for (const cat of defaultCategories) {
               await addDoc(collection(db, 'categories'), cat);
             }
+            console.log("Seeding complete.");
           }
         } catch (error: any) {
           console.error("Error seeding categories:", error);
@@ -545,7 +539,7 @@ function Dashboard() {
         // Expenses by category
         const expenses = filtered.filter(tx => tx.type === 'expense');
         const data: { name: string; value: number }[] = [];
-        CATEGORIES.forEach(cat => {
+        categories.filter(c => c.type === 'expense').forEach(cat => {
           const total = expenses.filter(tx => tx.category === cat.name).reduce((acc, tx) => acc + tx.amount, 0);
           if (total > 0) data.push({ name: cat.name, value: total });
         });
@@ -573,7 +567,7 @@ function Dashboard() {
       if (chartView === 'pie') {
         const expenses = filtered.filter(tx => tx.type === 'expense');
         const data: { name: string; value: number }[] = [];
-        CATEGORIES.forEach(cat => {
+        categories.filter(c => c.type === 'expense').forEach(cat => {
           const total = expenses.filter(tx => tx.category === cat.name).reduce((acc, tx) => acc + tx.amount, 0);
           if (total > 0) data.push({ name: cat.name, value: total });
         });
@@ -591,7 +585,7 @@ function Dashboard() {
         });
       }
     }
-  }, [transactions, chartView, timeRange, selectedYear, selectedMonth]);
+  }, [transactions, chartView, timeRange, selectedYear, selectedMonth, categories]);
 
   const COLORS = ['#5A5A40', '#8E8E6B', '#C2C296', '#E6E6D1', '#A3A375', '#70704F'];
 
@@ -727,10 +721,10 @@ function Dashboard() {
             {isAdmin && (
               <Link 
                 to="/adminpanel" 
-                className="hidden sm:flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[#5A5A40]/40 hover:text-[#5A5A40] transition-colors"
+                className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[#5A5A40]/40 hover:text-[#5A5A40] transition-colors"
               >
                 <Shield className="w-4 h-4" />
-                {t('dash.adminPanel')}
+                <span className="hidden sm:inline">{t('dash.adminPanel')}</span>
               </Link>
             )}
             <button 

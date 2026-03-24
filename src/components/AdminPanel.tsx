@@ -263,13 +263,16 @@ export function AdminPanel() {
     }
 
     try {
+      console.log("Adding category:", newCategory);
       await addDoc(collection(db, 'categories'), {
         name: newCategory.name.trim(),
         type: newCategory.type
       });
+      console.log("Category added successfully");
       setNewCategory({ name: '', type: 'expense' });
       setIsAddingCategory(false);
     } catch (error: any) {
+      console.error("Error adding category:", error);
       handleFirestoreError(error, OperationType.CREATE, 'categories');
     }
   };
@@ -293,21 +296,25 @@ export function AdminPanel() {
       { name: 'Security', type: 'expense' },
       { name: 'Cleaning', type: 'expense' },
       { name: 'Others', type: 'expense' },
-      { name: 'Salary', type: 'income' },
+      { name: 'Salary', type: 'expense' },
       { name: 'Rent', type: 'income' },
       { name: 'Maintenance Collection', type: 'income' }
     ];
 
     try {
+      console.log("Seeding categories...");
       for (const cat of defaultCategories) {
         // Check if exists
         const exists = categories.some(c => c.name === cat.name && c.type === cat.type);
         if (!exists) {
+          console.log("Seeding category:", cat.name);
           await addDoc(collection(db, 'categories'), cat);
         }
       }
+      console.log("Seeding complete.");
       alert("Default categories seeded successfully!");
     } catch (error: any) {
+      console.error("Error seeding categories:", error);
       handleFirestoreError(error, OperationType.CREATE, 'categories');
     } finally {
       setIsSeeding(false);
