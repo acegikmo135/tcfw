@@ -14,9 +14,10 @@ interface BeforeInstallPromptEvent extends Event {
 
 interface InstallPWAProps {
   alwaysShow?: boolean;
+  inline?: boolean;
 }
 
-export function InstallPWA({ alwaysShow = false }: InstallPWAProps) {
+export function InstallPWA({ alwaysShow = false, inline = false }: InstallPWAProps) {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstallable, setIsInstallable] = useState(false);
   const { t } = useLanguage();
@@ -67,10 +68,14 @@ export function InstallPWA({ alwaysShow = false }: InstallPWAProps) {
   }
 
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
+    <div className={inline ? "w-full" : "fixed bottom-6 left-1/2 -translate-x-1/2 z-50"}>
       <button
         onClick={handleInstallClick}
-        className="flex items-center gap-2 bg-blue-700 text-white px-6 py-3 rounded-full font-bold shadow-lg shadow-blue-700/20 hover:bg-blue-800 transition-all hover:-translate-y-1"
+        className={`flex items-center gap-2 px-6 py-3 rounded-full font-bold transition-all hover:-translate-y-1 ${
+          inline 
+            ? "bg-white/20 text-white hover:bg-white/30 w-full justify-center border border-white/30" 
+            : "bg-blue-700 text-white shadow-lg shadow-blue-700/20 hover:bg-blue-800"
+        }`}
       >
         <Download className="w-5 h-5" />
         {t('pwa.install')}

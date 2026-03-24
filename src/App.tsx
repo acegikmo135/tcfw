@@ -273,6 +273,8 @@ function Dashboard() {
     return () => unsubscribe();
   }, []);
 
+  const isAdmin = flatInfo?.role === 'admin' || user?.email === 'manthankansagra@gmail.com';
+
   // Transactions Listener
   useEffect(() => {
     if (!user) return;
@@ -729,7 +731,7 @@ function Dashboard() {
             >
               <UserIcon className="w-5 h-5" />
             </Link>
-            {flatInfo?.role === 'admin' && (
+            {isAdmin && (
               <Link 
                 to="/adminpanel" 
                 className="hidden sm:flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[#5A5A40]/40 hover:text-[#5A5A40] transition-colors"
@@ -812,7 +814,7 @@ function Dashboard() {
                   <Bell className="w-5 h-5 text-[#5A5A40]" />
                   Building Notices
                 </h3>
-                {flatInfo?.role === 'admin' && (
+                {isAdmin && (
                   <button 
                     onClick={() => {
                       setEditingNotice(null);
@@ -849,7 +851,7 @@ function Dashboard() {
                           {notice.createdAt?.toDate ? notice.createdAt.toDate().toLocaleDateString() : 'Just now'} • By {notice.createdBy}
                         </p>
                       </div>
-                      {flatInfo?.role === 'admin' && (
+                      {isAdmin && (
                         <div className="flex items-center gap-1">
                           <button 
                             onClick={() => togglePinNotice(notice)}
@@ -899,7 +901,7 @@ function Dashboard() {
                   <Download className="w-4 h-4" />
                   {t('dash.export')}
                 </button>
-                {flatInfo?.role === 'admin' && (
+                {isAdmin && (
                   <button 
                     onClick={() => setIsAdding(true)}
                     className="flex items-center gap-2 bg-[#5A5A40] text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-[#4A4A30] transition-colors"
@@ -1030,7 +1032,7 @@ function Dashboard() {
                               <span className="absolute top-1 right-1 w-2 h-2 bg-rose-500 rounded-full border border-white" />
                             )}
                           </button>
-                          {flatInfo?.role === 'admin' && (
+                          {isAdmin && (
                             <button 
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -1175,15 +1177,12 @@ function Dashboard() {
 
             <div className="bg-[#5A5A40] p-6 rounded-[32px] text-white">
               <h3 className="text-lg font-serif mb-2">{t('dash.health')}</h3>
-              <p className="text-sm text-white/70 leading-relaxed">
+              <p className="text-sm text-white/70 leading-relaxed mb-6">
                 {balance > 0 
                   ? t('dash.healthGood')
                   : t('dash.healthBad')}
               </p>
-            </div>
-
-            <div className="mt-4">
-              <InstallPWA alwaysShow={true} />
+              <InstallPWA alwaysShow={true} inline={true} />
             </div>
           </div>
         </div>

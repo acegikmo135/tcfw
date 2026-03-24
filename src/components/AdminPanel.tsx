@@ -238,17 +238,6 @@ export function AdminPanel() {
         createdAt: serverTimestamp()
       });
       
-      // Trigger notification
-      fetch('/api/notify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: "New Notice",
-          message: `${title}: ${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`,
-          url: window.location.origin
-        })
-      }).catch(err => console.error("Notification error:", err));
-
       setIsAddingNotice(false);
     } catch (error: any) {
       handleFirestoreError(error, OperationType.CREATE, 'notices');
@@ -355,9 +344,9 @@ export function AdminPanel() {
   return (
     <div className="min-h-screen bg-[#F5F5F0] pb-20">
       {/* Header */}
-      <header className="bg-white border-b border-black/5 sticky top-0 z-40">
-        <div className="max-w-5xl mx-auto px-4 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+      <header className="bg-white border-b border-black/5 sticky top-0 z-30">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+          <div className="flex items-center gap-4">
             <div className="w-10 h-10 bg-[#5A5A40] rounded-xl flex items-center justify-center overflow-hidden">
               <img src="https://raw.githubusercontent.com/acegikmo135/assets/main/vbub4efh.jpg" alt="Logo" className="w-full h-full object-cover" />
             </div>
@@ -366,14 +355,14 @@ export function AdminPanel() {
               <p className="text-[10px] uppercase tracking-[0.2em] text-[#5A5A40]/40 font-bold">{t('dash.adminPanel')}</p>
             </div>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
             <button
               onClick={() => setLanguage(language === 'en' ? 'gu' : 'en')}
-              className="text-xs font-bold uppercase tracking-widest text-[#5A5A40]/60 hover:text-[#5A5A40] transition-colors"
+              className="text-xs font-bold uppercase tracking-widest text-[#5A5A40]/60 hover:text-[#5A5A40] transition-colors p-2"
             >
               {language === 'en' ? 'GU' : 'EN'}
             </button>
-            <Link to="/" className="text-sm font-medium text-[#5A5A40]/60 hover:text-[#5A5A40] transition-colors">
+            <Link to="/" className="text-sm font-medium text-[#5A5A40]/60 hover:text-[#5A5A40] transition-colors hidden sm:inline">
               {t('admin.back')}
             </Link>
             <button 
@@ -386,18 +375,18 @@ export function AdminPanel() {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
             <h2 className="text-3xl font-serif">{t('admin.flats')}</h2>
             <p className="text-[#5A5A40]/60 text-sm">{t('admin.manage')}</p>
           </div>
           <button 
             onClick={() => setIsAdding(true)}
-            className="bg-[#5A5A40] text-white px-6 py-3 rounded-full font-medium flex items-center gap-2 hover:bg-[#4A4A30] transition-all shadow-lg shadow-[#5A5A40]/20"
+            className="bg-[#5A5A40] text-white px-6 py-3 rounded-full font-medium flex items-center justify-center gap-2 hover:bg-[#4A4A30] transition-all shadow-lg shadow-[#5A5A40]/20"
           >
             <Plus className="w-5 h-5" />
-            <span className="hidden sm:inline">{t('admin.addFlat')}</span>
+            <span>{t('admin.addFlat')}</span>
           </button>
         </div>
 
@@ -460,17 +449,17 @@ export function AdminPanel() {
           </div>
         )}
 
-        <div className="flex items-center justify-between mb-8 mt-12 border-t border-black/5 pt-12">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 mt-12 border-t border-black/5 pt-12">
           <div>
             <h2 className="text-3xl font-serif">Notices</h2>
             <p className="text-[#5A5A40]/60 text-sm">Manage building notices</p>
           </div>
           <button 
             onClick={() => setIsAddingNotice(true)}
-            className="bg-[#5A5A40] text-white px-6 py-3 rounded-full font-medium flex items-center gap-2 hover:bg-[#4A4A30] transition-all shadow-lg shadow-[#5A5A40]/20"
+            className="bg-[#5A5A40] text-white px-6 py-3 rounded-full font-medium flex items-center justify-center gap-2 hover:bg-[#4A4A30] transition-all shadow-lg shadow-[#5A5A40]/20"
           >
             <Plus className="w-5 h-5" />
-            <span className="hidden sm:inline">Add Notice</span>
+            <span>Add Notice</span>
           </button>
         </div>
 
@@ -509,26 +498,26 @@ export function AdminPanel() {
             </div>
           )}
         </div>
-        <div className="flex items-center justify-between mb-8 mt-12 border-t border-black/5 pt-12">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 mt-12 border-t border-black/5 pt-12">
           <div>
             <h2 className="text-3xl font-serif">Categories</h2>
             <p className="text-[#5A5A40]/60 text-sm">Manage income and expense categories</p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex flex-col sm:flex-row gap-3">
             <button 
               onClick={seedCategories}
               disabled={isSeeding}
-              className="bg-white border border-[#5A5A40]/20 text-[#5A5A40] px-6 py-3 rounded-full font-medium flex items-center gap-2 hover:bg-[#F5F5F0] transition-all disabled:opacity-50"
+              className="bg-white border border-[#5A5A40]/20 text-[#5A5A40] px-6 py-3 rounded-full font-medium flex items-center justify-center gap-2 hover:bg-[#F5F5F0] transition-all disabled:opacity-50"
             >
               {isSeeding ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
-              <span className="hidden sm:inline">Seed Defaults</span>
+              <span>Seed Defaults</span>
             </button>
             <button 
               onClick={() => setIsAddingCategory(true)}
-              className="bg-[#5A5A40] text-white px-6 py-3 rounded-full font-medium flex items-center gap-2 hover:bg-[#4A4A30] transition-all shadow-lg shadow-[#5A5A40]/20"
+              className="bg-[#5A5A40] text-white px-6 py-3 rounded-full font-medium flex items-center justify-center gap-2 hover:bg-[#4A4A30] transition-all shadow-lg shadow-[#5A5A40]/20"
             >
               <Plus className="w-5 h-5" />
-              <span className="hidden sm:inline">Add Category</span>
+              <span>Add Category</span>
             </button>
           </div>
         </div>
@@ -575,24 +564,24 @@ export function AdminPanel() {
         </div>
       </main>
 
-      <footer className="max-w-5xl mx-auto px-4 py-8 border-t border-black/5 mt-8 text-center">
+      <footer className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 border-t border-black/5 mt-8 text-center">
         <p className="text-sm font-serif text-[#5A5A40] mb-4">Made by Manthan - F602</p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
           <a 
             href="https://manthank.com" 
             target="_blank" 
             rel="noopener noreferrer"
-            className="text-xs font-bold uppercase tracking-widest text-white bg-[#5A5A40] px-6 py-3 rounded-full hover:bg-[#4A4A30] transition-colors shadow-sm"
+            className="text-xs font-bold uppercase tracking-widest text-white bg-[#5A5A40] px-6 py-3 rounded-full hover:bg-[#4A4A30] transition-colors shadow-sm w-full sm:w-auto"
           >
             Visit Website
           </a>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col sm:flex-row items-center gap-3">
             <span className="text-xs text-[#5A5A40]/60">If any issue, contact dev@manthank.com</span>
             <a 
               href="https://mail.google.com/mail/?view=cm&fs=1&to=dev@manthank.com" 
               target="_blank" 
               rel="noopener noreferrer"
-              className="text-xs font-bold uppercase tracking-widest text-[#5A5A40] border border-[#5A5A40]/20 px-6 py-3 rounded-full hover:bg-[#F5F5F0] transition-colors"
+              className="text-xs font-bold uppercase tracking-widest text-[#5A5A40] border border-[#5A5A40]/20 px-6 py-3 rounded-full hover:bg-[#F5F5F0] transition-colors w-full sm:w-auto"
             >
               Email Support
             </a>
