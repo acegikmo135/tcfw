@@ -61,6 +61,12 @@ service cloud.firestore {
              data.createdAt is timestamp;
     }
 
+    function isValidCategory(data) {
+      return data.keys().hasAll(['name', 'type']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 50 &&
+             data.type in ['income', 'expense'];
+    }
+
     match /flats/{flatId} {
       allow read: if isAuthenticated();
       // Allow admins to manage all flats
@@ -97,6 +103,13 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create: if isAdmin() && isValidNotice(request.resource.data);
       allow update: if isAdmin() && isValidNotice(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /categories/{categoryId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() && isValidCategory(request.resource.data);
+      allow update: if isAdmin() && isValidCategory(request.resource.data);
       allow delete: if isAdmin();
     }
   }

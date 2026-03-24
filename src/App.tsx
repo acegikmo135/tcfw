@@ -52,7 +52,6 @@ import {
   EyeOff,
   Smartphone
 } from 'lucide-react';
-import OneSignal from 'react-onesignal';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { 
@@ -149,14 +148,14 @@ function Dashboard() {
   const [exportMonth, setExportMonth] = useState(new Date().getMonth());
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
+  const [newTxType, setNewTxType] = useState<TransactionType>('income');
   const [notices, setNotices] = useState<Notice[]>([]);
-  const [categories, setCategories] = useState<{id: string, name: string}[]>([]);
+  const [categories, setCategories] = useState<{id: string, name: string, type: string}[]>([]);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [isAddingNotice, setIsAddingNotice] = useState(false);
   const [editingNotice, setEditingNotice] = useState<Notice | null>(null);
   const [deletingNoticeId, setDeletingNoticeId] = useState<string | null>(null);
   const [noticeError, setNoticeError] = useState("");
-  const [isSubscribed, setIsSubscribed] = useState(false);
 
   // Chart State
   const [chartView, setChartView] = useState<'pie' | 'line'>('pie');
@@ -192,35 +191,6 @@ function Dashboard() {
     testConnection();
   }, []);
 
-  // OneSignal initialization
-  useEffect(() => {
-    const initOneSignal = async () => {
-      const appId = import.meta.env.VITE_ONESIGNAL_APP_ID;
-      if (!appId) return;
-      try {
-        await OneSignal.init({
-          appId,
-          allowLocalhostAsSecureOrigin: true,
-          serviceWorkerParam: { scope: '/' },
-          serviceWorkerPath: 'OneSignalSDKWorker.js',
-        });
-        
-        // Check initial subscription status
-        const pushId = await OneSignal.User.PushSubscription.id;
-        const optedIn = OneSignal.User.PushSubscription.optedIn;
-        setIsSubscribed(!!pushId && optedIn);
-        
-        // Listen for changes
-        OneSignal.User.PushSubscription.addEventListener('change', (event) => {
-          setIsSubscribed(!!event.current.id && event.current.optedIn);
-        });
-      } catch (e) {
-        console.error("OneSignal init error:", e);
-      }
-    };
-    initOneSignal();
-  }, []);
-
   // Initialize Default Categories
   useEffect(() => {
     const initCategories = async () => {
@@ -247,10 +217,15 @@ function Dashboard() {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({
         id: doc.id,
-        name: doc.data().name
+        name: doc.data().name,
+        type: doc.data().type
       }));
       if (data.length === 0) {
-        setCategories(CATEGORIES.map(c => ({ id: c.id, name: c.name })));
+        setCategories([
+          ...CATEGORIES.map(c => ({ id: c.id, name: c.name, type: 'expense' })),
+          { id: 'salary', name: 'Salary', type: 'income' },
+          { id: 'rent', name: 'Rent', type: 'income' }
+        ]);
       } else {
         setCategories(data);
       }
@@ -328,22 +303,11 @@ function Dashboard() {
     try {
       if (!user || !user.email) throw new Error("Not authenticated");
       
-      if (editingNotice) {
+        if (editingNotice) {
         await updateDoc(doc(db, 'notices', editingNotice.id), {
           title,
           content
         });
-        
-        // Trigger notification for update
-        fetch('/api/notify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: "Notice Updated",
-            message: `${title}: ${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`,
-            url: window.location.origin
-          })
-        }).catch(err => console.error("Notification error:", err));
       } else {
         await addDoc(collection(db, 'notices'), {
           title,
@@ -352,17 +316,6 @@ function Dashboard() {
           createdAt: serverTimestamp(),
           isPinned: false
         });
-
-        // Trigger notification
-        fetch('/api/notify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: "New Notice",
-            message: `${title}: ${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`,
-            url: window.location.origin
-          })
-        }).catch(err => console.error("Notification error:", err));
       }
       
       setIsAddingNotice(false);
@@ -833,9 +786,93 @@ function Dashboard() {
 
         {/* Actions & List */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Transaction List */}
+          {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            {/* Notices Section - MOVED AND HIGHLIGHTED */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-serif flex items-center gap-2">
+                  <Bell className="w-5 h-5 text-[#5A5A40]" />
+                  Building Notices
+                </h3>
+                {flatInfo?.role === 'admin' && (
+                  <button 
+                    onClick={() => {
+                      setEditingNotice(null);
+                      setIsAddingNotice(true);
+                    }}
+                    className="text-[#5A5A40] hover:bg-[#5A5A40]/5 p-2 rounded-full transition-colors"
+                  >
+                    <PlusCircle className="w-5 h-5" />
+                  </button>
+                )}
+              </div>
+              
+              <div className="grid grid-cols-1 gap-4">
+                {notices.map((notice) => (
+                  <motion.div 
+                    key={notice.id}
+                    layout
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={cn(
+                      "bg-white p-6 rounded-[32px] shadow-md border-2 transition-all",
+                      notice.isPinned 
+                        ? "border-[#5A5A40] bg-[#5A5A40]/10 ring-4 ring-[#5A5A40]/5" 
+                        : "border-[#5A5A40]/20 bg-[#5A5A40]/5"
+                    )}
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-2">
+                          {notice.isPinned && <Pin className="w-4 h-4 text-[#5A5A40]" />}
+                          <h4 className="font-serif text-lg font-bold">{notice.title}</h4>
+                        </div>
+                        <p className="text-[10px] uppercase tracking-widest font-bold text-[#5A5A40]/40 mt-1">
+                          {notice.createdAt?.toDate ? notice.createdAt.toDate().toLocaleDateString() : 'Just now'} • By {notice.createdBy}
+                        </p>
+                      </div>
+                      {flatInfo?.role === 'admin' && (
+                        <div className="flex items-center gap-1">
+                          <button 
+                            onClick={() => togglePinNotice(notice)}
+                            className={cn(
+                              "p-2 rounded-full transition-colors",
+                              notice.isPinned ? "text-[#5A5A40] bg-[#5A5A40]/10" : "text-[#5A5A40]/40 hover:bg-[#F5F5F0]"
+                            )}
+                          >
+                            <Pin className="w-4 h-4" />
+                          </button>
+                          <button 
+                            onClick={() => {
+                              setEditingNotice(notice);
+                              setIsAddingNotice(true);
+                            }}
+                            className="p-2 text-[#5A5A40]/40 hover:text-[#5A5A40] hover:bg-[#F5F5F0] rounded-full transition-colors"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button 
+                            onClick={() => deleteNotice(notice.id)}
+                            className="p-2 text-rose-500/40 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-sm text-[#1A1A1A] mb-2 whitespace-pre-wrap leading-relaxed font-medium">{notice.content}</p>
+                  </motion.div>
+                ))}
+                {notices.length === 0 && (
+                  <div className="text-center py-12 bg-white rounded-[32px] border border-dashed border-[#5A5A40]/20">
+                    <p className="text-[#5A5A40]/40 font-serif italic">No notices at the moment.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4">
               <h3 className="text-xl font-serif">{t('dash.recent')}</h3>
               <div className="flex items-center gap-2">
                 <button 
@@ -885,87 +922,7 @@ function Dashboard() {
               </div>
             </div>
 
-            {/* Notices Section */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xl font-serif">Building Notices</h3>
-                {flatInfo?.role === 'admin' && (
-                  <button 
-                    onClick={() => {
-                      setEditingNotice(null);
-                      setIsAddingNotice(true);
-                    }}
-                    className="text-[#5A5A40] hover:bg-[#5A5A40]/5 p-2 rounded-full transition-colors"
-                  >
-                    <PlusCircle className="w-5 h-5" />
-                  </button>
-                )}
-              </div>
-              
-              <div className="grid grid-cols-1 gap-4">
-                {notices.map((notice) => (
-                  <motion.div 
-                    key={notice.id}
-                    layout
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className={cn(
-                      "bg-white p-6 rounded-[32px] shadow-sm border transition-all",
-                      notice.isPinned ? "border-[#5A5A40]/30 bg-[#5A5A40]/5" : "border-black/5"
-                    )}
-                  >
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex flex-col">
-                        <div className="flex items-center gap-2">
-                          {notice.isPinned && <Pin className="w-4 h-4 text-[#5A5A40]" />}
-                          <h4 className="font-serif text-lg">{notice.title}</h4>
-                        </div>
-                        <p className="text-[10px] uppercase tracking-widest font-bold text-[#5A5A40]/40 mt-1">
-                          {notice.createdAt?.toDate ? notice.createdAt.toDate().toLocaleDateString() : 'Just now'} • By {notice.createdBy}
-                        </p>
-                      </div>
-                      {flatInfo?.role === 'admin' && (
-                        <div className="flex items-center gap-1">
-                          <button 
-                            onClick={() => togglePinNotice(notice)}
-                            className={cn(
-                              "p-2 rounded-full transition-colors",
-                              notice.isPinned ? "text-[#5A5A40] bg-[#5A5A40]/10" : "text-[#5A5A40]/40 hover:bg-[#F5F5F0]"
-                            )}
-                          >
-                            <Pin className="w-4 h-4" />
-                          </button>
-                          <button 
-                            onClick={() => {
-                              setEditingNotice(notice);
-                              setIsAddingNotice(true);
-                            }}
-                            className="p-2 text-[#5A5A40]/40 hover:text-[#5A5A40] hover:bg-[#F5F5F0] rounded-full transition-colors"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                          <button 
-                            onClick={() => deleteNotice(notice.id)}
-                            className="p-2 text-rose-500/40 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                    <p className="text-sm text-[#5A5A40]/80 mb-2 whitespace-pre-wrap leading-relaxed">{notice.content}</p>
-                  </motion.div>
-                ))}
-                {notices.length === 0 && (
-                  <div className="text-center py-12 bg-white rounded-[32px] border border-dashed border-[#5A5A40]/20">
-                    <p className="text-[#5A5A40]/40 font-serif italic">No notices at the moment.</p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <AnimatePresence mode="popLayout">
+            <AnimatePresence mode="popLayout">
                 {loading ? (
                   <motion.div 
                     key="skeleton-list"
@@ -1075,7 +1032,6 @@ function Dashboard() {
                 )}
               </AnimatePresence>
             </div>
-          </div>
 
           {/* Charts Sidebar */}
           <div className="space-y-6">
@@ -1209,27 +1165,8 @@ function Dashboard() {
               </p>
             </div>
 
-            <div className="mt-4 flex gap-2">
-              <div className="flex-1">
-                <InstallPWA alwaysShow={true} />
-              </div>
-              {!isSubscribed && (
-                <button
-                  onClick={() => {
-                    try {
-                      OneSignal.Slidedown.promptPush();
-                    } catch (e) {
-                      console.error("OneSignal prompt error:", e);
-                      alert("Notification prompt is not available at the moment.");
-                    }
-                  }}
-                  className="flex items-center justify-center gap-2 bg-[#5A5A40] text-white px-6 py-3 rounded-2xl font-medium hover:bg-[#4A4A30] transition-all text-xs font-bold uppercase tracking-widest shadow-lg shadow-[#5A5A40]/20"
-                  title="Enable Notifications"
-                >
-                  <Bell className="w-4 h-4" />
-                  {t('dash.notify') || 'Notify'}
-                </button>
-              )}
+            <div className="mt-4">
+              <InstallPWA alwaysShow={true} />
             </div>
           </div>
         </div>
@@ -1259,92 +1196,6 @@ function Dashboard() {
           </div>
         </div>
       </footer>
-
-      {/* Transaction Details Modal */}
-      <AnimatePresence>
-        {selectedTransactionForDetails && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setSelectedTransactionForDetails(null)}
-              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-            />
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-md bg-white rounded-[32px] p-8 shadow-2xl overflow-hidden"
-            >
-              <div className={cn(
-                "absolute top-0 left-0 w-full h-2",
-                selectedTransactionForDetails.type === 'income' ? "bg-emerald-500" : "bg-rose-500"
-              )} />
-              
-              <div className="flex justify-between items-start mb-6">
-                <div>
-                  <h3 className="text-2xl font-serif">{selectedTransactionForDetails.category}</h3>
-                  <p className="text-sm text-[#5A5A40]/60">
-                    {selectedTransactionForDetails.date ? format(selectedTransactionForDetails.date.toDate(), 'MMMM d, yyyy • h:mm a') : 'Processing...'}
-                  </p>
-                </div>
-                <div className={cn(
-                  "px-4 py-2 rounded-xl text-sm font-bold uppercase tracking-widest",
-                  selectedTransactionForDetails.type === 'income' ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
-                )}>
-                  {selectedTransactionForDetails.type}
-                </div>
-              </div>
-
-              <div className="space-y-6">
-                <div className="bg-[#F5F5F0] p-6 rounded-2xl">
-                  <p className="text-xs uppercase tracking-widest text-[#5A5A40]/40 mb-1 font-bold">Amount</p>
-                  <p className={cn(
-                    "text-4xl font-serif",
-                    selectedTransactionForDetails.type === 'income' ? "text-emerald-600" : "text-rose-600"
-                  )}>
-                    ₹{selectedTransactionForDetails.amount.toLocaleString()}
-                  </p>
-                </div>
-
-                {selectedTransactionForDetails.description && (
-                  <div>
-                    <p className="text-xs uppercase tracking-widest text-[#5A5A40]/40 mb-2 font-bold">Description</p>
-                    <p className="text-[#5A5A40] leading-relaxed bg-[#F5F5F0]/50 p-4 rounded-2xl border border-black/5">
-                      {selectedTransactionForDetails.description}
-                    </p>
-                  </div>
-                )}
-
-                <div className="flex items-center justify-between pt-6 border-t border-black/5">
-                  <div>
-                    <p className="text-[10px] uppercase tracking-widest text-[#5A5A40]/40 font-bold">Recorded By</p>
-                    <p className="font-medium text-[#5A5A40]">Flat {selectedTransactionForDetails.createdBy}</p>
-                  </div>
-                  <button 
-                    onClick={() => {
-                      setSelectedTransactionForComments(selectedTransactionForDetails);
-                      setSelectedTransactionForDetails(null);
-                    }}
-                    className="flex items-center gap-2 bg-[#5A5A40] text-white px-6 py-3 rounded-full text-xs font-bold uppercase tracking-widest hover:bg-[#4A4A30] transition-colors"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-message-circle"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>
-                    Comments
-                  </button>
-                </div>
-
-                <button 
-                  onClick={() => setSelectedTransactionForDetails(null)}
-                  className="w-full py-4 rounded-full font-bold text-xs uppercase tracking-widest text-[#5A5A40] bg-[#F5F5F0] hover:bg-black/5 transition-colors mt-4"
-                >
-                  Close
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
       {/* Add Transaction Modal */}
       <AnimatePresence>
@@ -1380,16 +1231,6 @@ function Dashboard() {
                   setIsAdding(false);
                   try {
                     await addDoc(collection(db, 'transactions'), data);
-                    // Trigger notification
-                    fetch('/api/notify', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        title: `New ${data.type === 'income' ? 'Income' : 'Expense'}`,
-                        message: `${data.description || data.category}: ₹${data.amount.toLocaleString()} by ${data.createdBy}`,
-                        url: window.location.origin
-                      })
-                    }).catch(err => console.error("Notification error:", err));
                   } catch (error) {
                     handleFirestoreError(error, OperationType.CREATE, 'transactions');
                   }
@@ -1398,14 +1239,28 @@ function Dashboard() {
               >
                 <div className="grid grid-cols-2 gap-4">
                   <label className="relative cursor-pointer">
-                    <input type="radio" name="type" value="income" defaultChecked className="peer sr-only" />
+                    <input 
+                      type="radio" 
+                      name="type" 
+                      value="income" 
+                      checked={newTxType === 'income'} 
+                      onChange={() => setNewTxType('income')}
+                      className="peer sr-only" 
+                    />
                     <div className="p-4 rounded-2xl bg-[#F5F5F0] border-2 border-transparent peer-checked:border-emerald-500 peer-checked:bg-emerald-50 transition-all text-center">
                       <TrendingUp className="w-6 h-6 mx-auto mb-2 text-emerald-600" />
                       <span className="text-xs font-bold uppercase tracking-widest">{t('income')}</span>
                     </div>
                   </label>
                   <label className="relative cursor-pointer">
-                    <input type="radio" name="type" value="expense" className="peer sr-only" />
+                    <input 
+                      type="radio" 
+                      name="type" 
+                      value="expense" 
+                      checked={newTxType === 'expense'} 
+                      onChange={() => setNewTxType('expense')}
+                      className="peer sr-only" 
+                    />
                     <div className="p-4 rounded-2xl bg-[#F5F5F0] border-2 border-transparent peer-checked:border-rose-500 peer-checked:bg-rose-50 transition-all text-center">
                       <TrendingDown className="w-6 h-6 mx-auto mb-2 text-rose-600" />
                       <span className="text-xs font-bold uppercase tracking-widest">{t('expense')}</span>
@@ -1431,7 +1286,7 @@ function Dashboard() {
                       required
                       className="w-full px-4 py-3 bg-[#F5F5F0] border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40]/20 outline-none appearance-none"
                     >
-                      {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                      {categories.filter(c => c.type === newTxType).map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                     </select>
                   </div>
                 </div>

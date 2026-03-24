@@ -49,9 +49,35 @@
         "createdAt": { "type": "string", "format": "date-time", "description": "When the notice was created." }
       },
       "required": ["title", "content", "createdBy", "createdAt"]
+    },
+    "categories": {
+      "title": "Category",
+      "description": "Income and expense categories",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the category"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["income", "expense"],
+          "description": "Type of category"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp"
+        }
+      },
+      "required": ["name", "type"]
     }
   },
   "firestore": {
+    "/categories/{categoryId}": {
+      "schema": "categories",
+      "description": "Global categories for transactions"
+    },
     "/flats/{flatId}": {
       "schema": "Flat",
       "description": "Collection of building flats and their credentials."

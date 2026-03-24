@@ -6,6 +6,8 @@ import {
   getDoc,
   setDoc, 
   deleteDoc,
+  addDoc,
+  serverTimestamp,
   query,
   orderBy
 } from 'firebase/firestore';
@@ -25,7 +27,9 @@ import {
   LogOut, 
   Lock,
   ArrowLeft,
-  Loader2
+  Loader2,
+  TrendingUp,
+  TrendingDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
@@ -60,11 +64,15 @@ export function AdminPanel() {
   const [user, setUser] = useState<User | null>(null);
   const [flats, setFlats] = useState<Flat[]>([]);
   const [notices, setNotices] = useState<Notice[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
   const [isAddingNotice, setIsAddingNotice] = useState(false);
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [newCategory, setNewCategory] = useState({ name: '', type: 'expense' });
   const [addError, setAddError] = useState("");
   const [noticeError, setNoticeError] = useState("");
+  const [categoryError, setCategoryError] = useState("");
 
   const { t, language, setLanguage } = useLanguage();
 
@@ -115,9 +123,17 @@ export function AdminPanel() {
       handleFirestoreError(error, OperationType.GET, 'notices');
     });
 
+    const qCategories = query(collection(db, 'categories'), orderBy('name', 'asc'));
+    const unsubscribeCategories = onSnapshot(qCategories, (snapshot) => {
+      setCategories(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'categories');
+    });
+
     return () => {
       unsubscribeFlats();
       unsubscribeNotices();
+      unsubscribeCategories();
     };
   }, [isAuthorized]);
 
@@ -244,6 +260,37 @@ export function AdminPanel() {
         await deleteDoc(doc(db, 'notices', id));
       } catch (error) {
         handleFirestoreError(error, OperationType.DELETE, `notices/${id}`);
+      }
+    }
+  };
+
+  const addCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCategoryError("");
+    if (!newCategory.name.trim()) {
+      setCategoryError("Please enter a category name");
+      return;
+    }
+
+    try {
+      const { addDoc, collection } = await import('firebase/firestore');
+      await addDoc(collection(db, 'categories'), {
+        name: newCategory.name.trim(),
+        type: newCategory.type
+      });
+      setNewCategory({ name: '', type: 'expense' });
+      setIsAddingCategory(false);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, 'categories');
+    }
+  };
+
+  const deleteCategory = async (id: string) => {
+    if (window.confirm("Are you sure you want to delete this category?")) {
+      try {
+        await deleteDoc(doc(db, 'categories', id));
+      } catch (error) {
+        handleFirestoreError(error, OperationType.DELETE, `categories/${id}`);
       }
     }
   };
@@ -427,6 +474,60 @@ export function AdminPanel() {
           {notices.length === 0 && (
             <div className="col-span-full py-12 text-center text-[#5A5A40]/40">
               No notices found.
+            </div>
+          )}
+        </div>
+        <div className="flex items-center justify-between mb-8 mt-12 border-t border-black/5 pt-12">
+          <div>
+            <h2 className="text-3xl font-serif">Categories</h2>
+            <p className="text-[#5A5A40]/60 text-sm">Manage income and expense categories</p>
+          </div>
+          <button 
+            onClick={() => setIsAddingCategory(true)}
+            className="bg-[#5A5A40] text-white px-6 py-3 rounded-full font-medium flex items-center gap-2 hover:bg-[#4A4A30] transition-all shadow-lg shadow-[#5A5A40]/20"
+          >
+            <Plus className="w-5 h-5" />
+            <span className="hidden sm:inline">Add Category</span>
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <AnimatePresence mode="popLayout">
+            {categories.map((category) => (
+              <motion.div 
+                key={category.id}
+                layout
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="bg-white p-6 rounded-[32px] shadow-sm border border-black/5 flex items-center justify-between group hover:shadow-md transition-all"
+              >
+                <div className="flex items-center gap-4">
+                  <div className={cn(
+                    "w-10 h-10 rounded-xl flex items-center justify-center",
+                    category.type === 'income' ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
+                  )}>
+                    {category.type === 'income' ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
+                  </div>
+                  <div>
+                    <h3 className="font-medium text-[#1A1A1A]">{category.name}</h3>
+                    <p className="text-[10px] uppercase tracking-widest font-bold text-[#5A5A40]/40">
+                      {category.type}
+                    </p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => deleteCategory(category.id)}
+                  className="p-2 text-rose-500/20 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
+                >
+                  <Trash2 className="w-5 h-5" />
+                </button>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+          {categories.length === 0 && (
+            <div className="col-span-full py-12 text-center text-[#5A5A40]/40">
+              No categories found.
             </div>
           )}
         </div>
@@ -615,6 +716,75 @@ export function AdminPanel() {
                     className="flex-1 bg-[#5A5A40] text-white py-4 rounded-full font-medium hover:bg-[#4A4A30] transition-colors"
                   >
                     Post Notice
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      {/* Add Category Modal */}
+      <AnimatePresence>
+        {isAddingCategory && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsAddingCategory(false)}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-md bg-white rounded-[32px] p-8 shadow-2xl"
+            >
+              <h3 className="text-2xl font-serif mb-6">Add New Category</h3>
+              <form onSubmit={addCategory} className="space-y-6">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-widest text-[#5A5A40]/40 mb-2">Category Name</label>
+                  <input 
+                    type="text"
+                    required
+                    value={newCategory.name}
+                    onChange={(e) => setNewCategory({ ...newCategory, name: e.target.value })}
+                    className="w-full px-4 py-3 bg-[#F5F5F0] border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40]/20 outline-none transition-all"
+                    placeholder="e.g. Plumbing, Wiring"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-widest text-[#5A5A40]/40 mb-2">Type</label>
+                  <div className="flex bg-[#F5F5F0] p-1 rounded-2xl">
+                    {(['income', 'expense'] as const).map((type) => (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => setNewCategory({ ...newCategory, type })}
+                        className={cn(
+                          "flex-1 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all",
+                          newCategory.type === type ? "bg-[#5A5A40] text-white shadow-sm" : "text-[#5A5A40]/40 hover:text-[#5A5A40]"
+                        )}
+                      >
+                        {type}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {categoryError && <p className="text-rose-500 text-xs font-medium">{categoryError}</p>}
+                <div className="flex gap-3 pt-2">
+                  <button 
+                    type="button"
+                    onClick={() => setIsAddingCategory(false)}
+                    className="flex-1 py-4 text-xs font-bold uppercase tracking-widest text-[#5A5A40] border border-[#5A5A40]/10 rounded-full hover:bg-[#F5F5F0] transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    type="submit"
+                    className="flex-1 py-4 text-xs font-bold uppercase tracking-widest text-white bg-[#5A5A40] rounded-full hover:bg-[#4A4A30] transition-colors shadow-lg shadow-[#5A5A40]/20"
+                  >
+                    Add Category
                   </button>
                 </div>
               </form>

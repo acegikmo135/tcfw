@@ -5,7 +5,6 @@ import { fileURLToPath } from "url";
 import cookieParser from "cookie-parser";
 import admin from "firebase-admin";
 import fs from "fs";
-import * as OneSignal from 'onesignal-node';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -45,65 +44,12 @@ if (firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !==
   db.settings({ databaseId: firebaseConfig.firestoreDatabaseId });
 }
 
-// Initialize OneSignal
-const oneSignalClient = process.env.ONESIGNAL_APP_ID && process.env.ONESIGNAL_REST_API_KEY
-  ? new OneSignal.Client(process.env.ONESIGNAL_APP_ID, process.env.ONESIGNAL_REST_API_KEY)
-  : null;
-
-async function sendNotification(title: string, message: string, data?: any) {
-  if (!oneSignalClient) return;
-  try {
-    const notification = {
-      contents: { en: message },
-      headings: { en: title },
-      included_segments: ["All"],
-      data: data || {}
-    };
-    await oneSignalClient.createNotification(notification);
-  } catch (e) {
-    console.error("Failed to send notification:", e);
-  }
-}
-
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
   app.use(express.json());
   app.use(cookieParser());
-
-  // OneSignal Notification Helper
-  app.post("/api/notify", async (req, res) => {
-    try {
-      const { title, message, url, data } = req.body;
-      console.log("Incoming notification request:", { title, message, url, data });
-      
-      if (!oneSignalClient) {
-        console.error("OneSignal client not initialized. Check ONESIGNAL_APP_ID and ONESIGNAL_REST_API_KEY.");
-        return res.status(503).json({ error: "OneSignal not configured" });
-      }
-
-      const notification = {
-        contents: {
-          en: message,
-        },
-        headings: {
-          en: title,
-        },
-        included_segments: ['All'],
-        url: url || process.env.APP_URL || "http://localhost:3000",
-        data: data || {}
-      };
-
-      console.log("Sending notification to OneSignal:", notification);
-      const response = await oneSignalClient.createNotification(notification);
-      console.log("OneSignal response:", response);
-      res.json({ success: true, response });
-    } catch (error) {
-      console.error("OneSignal error details:", error);
-      res.status(500).json({ error: "Failed to send notification" });
-    }
-  });
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
