@@ -337,6 +337,15 @@ function Dashboard() {
           createdAt: serverTimestamp(),
           isPinned: false
         });
+        fetch('/api/notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: `📢 New Notice: ${title}`,
+            message: content.substring(0, 120),
+            url: window.location.origin,
+          }),
+        }).catch(console.error);
       }
       
       setIsAddingNotice(false);
@@ -1263,6 +1272,15 @@ function Dashboard() {
                   setIsAdding(false);
                   try {
                     await addDoc(collection(db, 'transactions'), data);
+                    fetch('/api/notify', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        title: `${data.type === 'income' ? '💰 New Income' : '💸 New Expense'}: ${data.category}`,
+                        message: `${data.type === 'income' ? '+' : '-'}₹${data.amount.toLocaleString()} — ${data.description || 'No description'} (by ${data.createdBy})`,
+                        url: window.location.origin,
+                      }),
+                    }).catch(console.error);
                   } catch (error) {
                     handleFirestoreError(error, OperationType.CREATE, 'transactions');
                   }
