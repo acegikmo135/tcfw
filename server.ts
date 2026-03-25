@@ -3,39 +3,14 @@ import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
 import cookieParser from "cookie-parser";
-import admin from "firebase-admin";
-import fs from "fs";
+import admin, { adminDb as db } from "./src/lib/admin-db.js";
+import { initAutoNotifications } from "./src/services/autoNotifications.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Initialize Firebase Admin
-if (!admin.apps.length) {
-  const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-  const projectId = process.env.VITE_FIREBASE_PROJECT_ID;
-
-  if (serviceAccountKey) {
-    try {
-      const serviceAccount = JSON.parse(serviceAccountKey);
-      admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-        databaseURL: `https://${projectId}.firebaseio.com`
-      });
-    } catch (e) {
-      console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY", e);
-      admin.initializeApp({ projectId });
-    }
-  } else {
-    admin.initializeApp({ projectId });
-  }
-}
-
-const db = admin.firestore();
-const databaseId = process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID;
-if (databaseId && databaseId !== "(default)") {
-  // @ts-ignore
-  db.settings({ databaseId });
-}
+// Start automatic notification listeners
+initAutoNotifications();
 
 async function startServer() {
   const app = express();
