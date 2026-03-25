@@ -8,7 +8,7 @@ import admin, { adminDb as db } from "./src/lib/admin-db.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const ONESIGNAL_APP_ID = process.env.ONESIGNAL_APP_ID || "";
+const ONESIGNAL_APP_ID = process.env.VITE_ONESIGNAL_APP_ID || process.env.ONESIGNAL_APP_ID || "";
 const ONESIGNAL_REST_API_KEY = process.env.ONESIGNAL_REST_API_KEY || "";
 
 async function sendOneSignalNotification(heading: string, content: string, url?: string) {
