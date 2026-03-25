@@ -7,12 +7,12 @@ importScripts('https://www.gstatic.com/firebasejs/10.11.0/firebase-messaging-com
 // We'll use a placeholder and instruct the user to update it if needed.
 
 firebase.initializeApp({
-  apiKey: "REPLACE_WITH_API_KEY",
-  authDomain: "REPLACE_WITH_AUTH_DOMAIN",
-  projectId: "REPLACE_WITH_PROJECT_ID",
-  storageBucket: "REPLACE_WITH_STORAGE_BUCKET",
-  messagingSenderId: "REPLACE_WITH_MESSAGING_SENDER_ID",
-  appId: "REPLACE_WITH_APP_ID"
+  apiKey: "AIzaSyB7_PWHoY22W6fDR2qQvxXucmsTbE0B3HQ",
+  authDomain: "gen-lang-client-0585758602.firebaseapp.com",
+  projectId: "gen-lang-client-0585758602",
+  storageBucket: "gen-lang-client-0585758602.firebasestorage.app",
+  messagingSenderId: "193816846730",
+  appId: "1:193816846730:web:fa28adf7a0c84af63ca873"
 });
 
 const messaging = firebase.messaging();
