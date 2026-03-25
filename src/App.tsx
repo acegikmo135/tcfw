@@ -155,13 +155,19 @@ function Dashboard() {
     const registerFCM = async () => {
       if (!messaging) return;
       try {
+        const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY?.trim();
+        if (!vapidKey) {
+          console.warn('FCM VAPID key is missing. Notifications will not be registered.');
+          return;
+        }
+
         const permission = await Notification.requestPermission();
         if (permission === 'granted') {
           // Explicitly register the service worker to ensure it's picked up correctly
           const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
           
           const token = await getToken(messaging, {
-            vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY,
+            vapidKey: vapidKey,
             serviceWorkerRegistration: registration
           });
           
@@ -235,7 +241,15 @@ function Dashboard() {
 
 
 
-  const isAdmin = flatInfo?.role === 'admin' || user?.email === 'manthankansagra@gmail.com' || user?.email === 'admin@building.local' || user?.email === 'f602@building.local';
+  const isAdmin = useMemo(() => {
+    if (!user) return false;
+    const adminEmails = ['manthankansagra@gmail.com', 'admin@building.local', 'f602@building.local'];
+    const isEmailAdmin = adminEmails.includes(user.email || '');
+    const isRoleAdmin = flatInfo?.role === 'admin';
+    const result = isEmailAdmin || isRoleAdmin;
+    console.log("Admin Check:", { email: user.email, isEmailAdmin, isRoleAdmin, result });
+    return result;
+  }, [user, flatInfo]);
 
   // Fetch Categories
   useEffect(() => {
@@ -1160,65 +1174,71 @@ function Dashboard() {
                 </div>
               </div>
 
-              <div className="h-[250px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  {chartView === 'pie' ? (
-                    <PieChart>
-                      <Pie
-                        data={chartData as any[]}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={80}
-                        paddingAngle={5}
-                        dataKey="value"
-                      >
-                        {(chartData as any[]).map((_, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip 
-                        contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                      />
-                      <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px' }} />
-                    </PieChart>
-                  ) : (
-                    <LineChart data={chartData as any[]}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F0F0F0" />
-                      <XAxis 
-                        dataKey="name" 
-                        axisLine={false} 
-                        tickLine={false} 
-                        tick={{ fontSize: 10, fill: '#5A5A40' }} 
-                      />
-                      <YAxis 
-                        axisLine={false} 
-                        tickLine={false} 
-                        tick={{ fontSize: 10, fill: '#5A5A40' }}
-                        tickFormatter={(value) => `₹${value}`}
-                      />
-                      <Tooltip 
-                        contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                      />
-                      <Line 
-                        type="monotone" 
-                        dataKey="income" 
-                        stroke="#10B981" 
-                        strokeWidth={2} 
-                        dot={false} 
-                        name={t('income')}
-                      />
-                      <Line 
-                        type="monotone" 
-                        dataKey="expense" 
-                        stroke="#EF4444" 
-                        strokeWidth={2} 
-                        dot={false} 
-                        name={t('expense')}
-                      />
-                    </LineChart>
-                  )}
-                </ResponsiveContainer>
+              <div className="h-[250px] w-full" style={{ minHeight: '250px' }}>
+                {(chartData as any[]).length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                    {chartView === 'pie' ? (
+                      <PieChart>
+                        <Pie
+                          data={chartData as any[]}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={60}
+                          outerRadius={80}
+                          paddingAngle={5}
+                          dataKey="value"
+                        >
+                          {(chartData as any[]).map((_, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip 
+                          contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                        />
+                        <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px' }} />
+                      </PieChart>
+                    ) : (
+                      <LineChart data={chartData as any[]}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F0F0F0" />
+                        <XAxis 
+                          dataKey="name" 
+                          axisLine={false} 
+                          tickLine={false} 
+                          tick={{ fontSize: 10, fill: '#5A5A40' }} 
+                        />
+                        <YAxis 
+                          axisLine={false} 
+                          tickLine={false} 
+                          tick={{ fontSize: 10, fill: '#5A5A40' }}
+                          tickFormatter={(value) => `₹${value}`}
+                        />
+                        <Tooltip 
+                          contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="income" 
+                          stroke="#10B981" 
+                          strokeWidth={2} 
+                          dot={false} 
+                          name={t('income')}
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="expense" 
+                          stroke="#EF4444" 
+                          strokeWidth={2} 
+                          dot={false} 
+                          name={t('expense')}
+                        />
+                      </LineChart>
+                    )}
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center text-[#5A5A40]/40 italic font-serif">
+                    No data to display
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1360,7 +1380,11 @@ function Dashboard() {
                       required
                       className="w-full px-4 py-3 bg-[#F5F5F0] border-none rounded-2xl focus:ring-2 focus:ring-[#5A5A40]/20 outline-none appearance-none"
                     >
-                      {categories.filter(c => c.type === newTxType).map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                      {categories.filter(c => c.type === newTxType).length > 0 ? (
+                        categories.filter(c => c.type === newTxType).map(c => <option key={c.id} value={c.name}>{c.name}</option>)
+                      ) : (
+                        <option value="">No categories found. Please seed them in Admin Panel.</option>
+                      )}
                     </select>
                   </div>
                 </div>

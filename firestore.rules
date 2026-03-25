@@ -30,11 +30,11 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAuthenticated() && 
-        (request.auth.token.email == "manthankansagra@gmail.com" || 
-         request.auth.token.email == "f602@building.local" ||
-         request.auth.token.email == "admin@building.local" ||
-         (exists(/databases/$(database)/documents/flats/$(request.auth.token.email.split('@')[0])) && 
-          get(/databases/$(database)/documents/flats/$(request.auth.token.email.split('@')[0])).data.role == 'admin'));
+        (request.auth.token.email.lower() == "manthankansagra@gmail.com" || 
+         request.auth.token.email.lower() == "f602@building.local" ||
+         request.auth.token.email.lower() == "admin@building.local" ||
+         (exists(/databases/$(database)/documents/flats/$(request.auth.token.email.split('@')[0].lower())) && 
+          get(/databases/$(database)/documents/flats/$(request.auth.token.email.split('@')[0].lower())).data.role == 'admin'));
     }
 
     // Validation Functions
