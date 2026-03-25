@@ -44,47 +44,47 @@ export function OneSignalButton({ className }: { className?: string }) {
       return;
     }
 
-    const check = () => {
-      window.OneSignalDeferred = window.OneSignalDeferred || [];
-      window.OneSignalDeferred.push(async (OneSignal: any) => {
-        try {
-          const opted = await OneSignal.User.PushSubscription.optedIn;
-          setStatus(opted ? 'subscribed' : 'unsubscribed');
-        } catch {
-          setStatus('unsubscribed');
-        }
-      });
-    };
-
-    const interval = setInterval(() => {
-      if (window.OneSignal) {
-        clearInterval(interval);
-        check();
+    // Wait for OneSignal to finish initializing, then read subscription state
+    const interval = setInterval(async () => {
+      const OneSignal = window.OneSignal;
+      if (!OneSignal) return;
+      clearInterval(interval);
+      try {
+        const opted = OneSignal.User?.PushSubscription?.optedIn;
+        setStatus(opted ? 'subscribed' : 'unsubscribed');
+      } catch {
+        setStatus('unsubscribed');
       }
     }, 300);
 
     return () => clearInterval(interval);
   }, []);
 
-  const handleClick = () => {
-    if (status === 'unsupported') return;
+  const handleClick = async () => {
+    if (status === 'loading' || status === 'unsupported') return;
+
+    const OneSignal = window.OneSignal;
+    if (!OneSignal) return;
+
     setStatus('loading');
-    window.OneSignalDeferred = window.OneSignalDeferred || [];
-    window.OneSignalDeferred.push(async (OneSignal: any) => {
-      try {
-        if (status === 'subscribed') {
-          await OneSignal.User.PushSubscription.optOut();
-          setStatus('unsubscribed');
-        } else {
-          await OneSignal.Slidedown.promptPush({ force: true });
-          const opted = await OneSignal.User.PushSubscription.optedIn;
-          setStatus(opted ? 'subscribed' : 'unsubscribed');
-        }
-      } catch (e) {
-        console.error('OneSignal error:', e);
+    try {
+      if (status === 'subscribed') {
+        await OneSignal.User.PushSubscription.optOut();
         setStatus('unsubscribed');
+      } else {
+        // Request browser permission then subscribe
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+          await OneSignal.User.PushSubscription.optIn();
+          setStatus('subscribed');
+        } else {
+          setStatus('unsubscribed');
+        }
       }
-    });
+    } catch (e) {
+      console.error('OneSignal error:', e);
+      setStatus('unsubscribed');
+    }
   };
 
   if (status === 'unsupported') return null;
