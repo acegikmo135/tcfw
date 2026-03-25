@@ -11,11 +11,11 @@ export default defineConfig(({mode}) => {
       VitePWA({
         registerType: 'autoUpdate',
         devOptions: {
-          enabled: true
+          enabled: false,
         },
         manifest: {
-          name: 'Courtyard F Admin',
-          short_name: 'Courtyard F Admin',
+          name: 'Courtyard F',
+          short_name: 'Courtyard F',
           description: 'Transparent Fund Management',
           theme_color: '#1d4ed8',
           background_color: '#F5F5F0',
@@ -51,6 +51,16 @@ export default defineConfig(({mode}) => {
       host: '0.0.0.0',
       allowedHosts: true,
       hmr: process.env.DISABLE_HMR !== 'true',
+      watch: {
+        ignored: [
+          '**/.local/**',
+          '**/dev-dist/**',
+          '**/node_modules/**',
+          '**/.git/**',
+          '**/.cache/**',
+          '**/dist/**',
+        ],
+      },
     },
   };
 });
