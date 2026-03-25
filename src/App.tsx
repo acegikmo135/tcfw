@@ -75,6 +75,7 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, startOf
 import { BrowserRouter, Routes, Route, Link, useNavigate } from 'react-router-dom';
 import { AdminPanel } from './components/AdminPanel';
 import { InstallPWA } from './components/InstallPWA';
+import { OneSignalButton, initOneSignal } from './components/OneSignalNotifications';
 import { CommentsModal } from './components/CommentsModal';
 import { Profile } from './components/Profile';
 import { LanguageProvider, useLanguage } from './contexts/LanguageContext';
@@ -159,6 +160,11 @@ function Dashboard() {
 
   const navigate = useNavigate();
   const { t, language, setLanguage } = useLanguage();
+
+  useEffect(() => {
+    const appId = import.meta.env.VITE_ONESIGNAL_APP_ID;
+    if (appId) initOneSignal(appId);
+  }, []);
 
   const years = useMemo(() => {
     const uniqueYears = new Set<number>();
@@ -1179,13 +1185,21 @@ function Dashboard() {
 
             <div className="bg-[#5A5A40] p-6 rounded-[32px] text-white">
               <h3 className="text-lg font-serif mb-2">{t('dash.health')}</h3>
-              <p className="text-sm text-white/70 leading-relaxed mb-6">
+              <p className="text-sm text-white/70 leading-relaxed">
                 {balance > 0 
                   ? t('dash.healthGood')
                   : t('dash.healthBad')}
               </p>
-              <InstallPWA alwaysShow={true} inline={true} />
             </div>
+
+            <InstallPWA
+              alwaysShow={true}
+              className="flex items-center gap-2 px-6 py-3 rounded-[20px] font-bold transition-all hover:-translate-y-0.5 bg-[#5A5A40] text-white w-full justify-center shadow-sm hover:bg-[#4A4A30]"
+            />
+
+            <OneSignalButton
+              className="flex items-center gap-2 px-6 py-3 rounded-[20px] font-bold transition-all hover:-translate-y-0.5 bg-white border border-[#5A5A40]/20 text-[#5A5A40] w-full justify-center shadow-sm hover:bg-[#F5F5F0]"
+            />
           </div>
         </div>
       </main>

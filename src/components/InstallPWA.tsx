@@ -15,9 +15,10 @@ interface BeforeInstallPromptEvent extends Event {
 interface InstallPWAProps {
   alwaysShow?: boolean;
   inline?: boolean;
+  className?: string;
 }
 
-export function InstallPWA({ alwaysShow = false, inline = false }: InstallPWAProps) {
+export function InstallPWA({ alwaysShow = false, inline = false, className }: InstallPWAProps) {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstallable, setIsInstallable] = useState(false);
   const { t } = useLanguage();
@@ -30,7 +31,6 @@ export function InstallPWA({ alwaysShow = false, inline = false }: InstallPWAPro
       setIsInstallable(true);
     };
 
-    // Check if it was already captured
     if ((window as any).deferredPWAInstallPrompt) {
       setDeferredPrompt((window as any).deferredPWAInstallPrompt);
       setIsInstallable(true);
@@ -44,38 +44,48 @@ export function InstallPWA({ alwaysShow = false, inline = false }: InstallPWAPro
   }, []);
 
   const handleInstallClick = async () => {
-    if (!deferredPrompt) {
-      return;
-    }
-    // Show the install prompt
+    if (!deferredPrompt) return;
     deferredPrompt.prompt();
-    // Wait for the user to respond to the prompt
     const { outcome } = await deferredPrompt.userChoice;
     if (outcome === 'accepted') {
       console.log('User accepted the install prompt');
-    } else {
-      console.log('User dismissed the install prompt');
     }
-    // We've used the prompt, and can't use it again, throw it away
     setDeferredPrompt(null);
     setIsInstallable(false);
   };
 
   const shouldShow = alwaysShow || isInstallable;
 
-  if (!shouldShow) {
-    return null;
+  if (!shouldShow) return null;
+
+  if (className) {
+    return (
+      <button onClick={handleInstallClick} className={className}>
+        <Download className="w-5 h-5" />
+        {t('pwa.install')}
+      </button>
+    );
+  }
+
+  if (inline) {
+    return (
+      <div className="w-full">
+        <button
+          onClick={handleInstallClick}
+          className="flex items-center gap-2 px-6 py-3 rounded-full font-bold transition-all hover:-translate-y-1 bg-white/20 text-white hover:bg-white/30 w-full justify-center border border-white/30"
+        >
+          <Download className="w-5 h-5" />
+          {t('pwa.install')}
+        </button>
+      </div>
+    );
   }
 
   return (
-    <div className={inline ? "w-full" : "fixed bottom-6 left-1/2 -translate-x-1/2 z-50"}>
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
       <button
         onClick={handleInstallClick}
-        className={`flex items-center gap-2 px-6 py-3 rounded-full font-bold transition-all hover:-translate-y-1 ${
-          inline 
-            ? "bg-white/20 text-white hover:bg-white/30 w-full justify-center border border-white/30" 
-            : "bg-blue-700 text-white shadow-lg shadow-blue-700/20 hover:bg-blue-800"
-        }`}
+        className="flex items-center gap-2 px-6 py-3 rounded-full font-bold transition-all hover:-translate-y-1 bg-blue-700 text-white shadow-lg shadow-blue-700/20 hover:bg-blue-800"
       >
         <Download className="w-5 h-5" />
         {t('pwa.install')}
