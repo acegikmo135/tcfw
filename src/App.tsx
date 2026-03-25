@@ -157,18 +157,28 @@ function Dashboard() {
       try {
         const permission = await Notification.requestPermission();
         if (permission === 'granted') {
+          // Explicitly register the service worker to ensure it's picked up correctly
+          const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+          
           const token = await getToken(messaging, {
-            vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY
+            vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY,
+            serviceWorkerRegistration: registration
           });
           
           if (token) {
+            console.log('FCM Token generated:', token);
             // Save token to Firestore
             await setDoc(doc(db, 'fcm_tokens', user.uid), {
               token,
               flatNo: flatInfo?.flatNo || 'unknown',
               updatedAt: serverTimestamp()
             });
+            console.log('FCM Token saved to Firestore');
+          } else {
+            console.warn('No FCM token received');
           }
+        } else {
+          console.warn('Notification permission denied');
         }
       } catch (err) {
         console.error('FCM registration error:', err);

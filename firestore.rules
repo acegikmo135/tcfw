@@ -69,6 +69,13 @@ service cloud.firestore {
              data.type in ['income', 'expense'];
     }
 
+    function isValidFCMToken(data) {
+      return data.keys().hasAll(['token', 'flatNo', 'updatedAt']) &&
+             data.token is string && data.token.size() > 0 &&
+             data.flatNo is string &&
+             data.updatedAt is timestamp;
+    }
+
     match /flats/{flatId} {
       allow read: if isAuthenticated();
       // Allow admins to manage all flats
@@ -113,6 +120,11 @@ service cloud.firestore {
       allow create: if isAdmin() && isValidCategory(request.resource.data);
       allow update: if isAdmin() && isValidCategory(request.resource.data);
       allow delete: if isAdmin();
+    }
+
+    match /fcm_tokens/{tokenId} {
+      allow read: if isAdmin();
+      allow write: if isAuthenticated() && tokenId == request.auth.uid && isValidFCMToken(request.resource.data);
     }
   }
 }

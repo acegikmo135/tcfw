@@ -43,16 +43,14 @@ Ensure the following variables are set in your AI Studio project settings:
 ### Server-side
 - `FIREBASE_SERVICE_ACCOUNT_KEY`: The JSON content from Step 3.
 
-## Step 5: Update Service Worker
+## Step 5: Service Worker (Done)
 
-The file `public/firebase-messaging-sw.js` contains placeholders. While the app will try to work without it for foreground messages, background messages require this file to have your correct config.
-
-1.  Open `public/firebase-messaging-sw.js`.
-2.  Replace the placeholders (`REPLACE_WITH_...`) with your actual Firebase configuration values.
+The file `public/firebase-messaging-sw.js` has been automatically updated with your Firebase configuration. You don't need to edit it manually unless your config changes.
 
 ## Step 6: Test Notifications
 
 1.  Open the app in a browser.
 2.  The browser will prompt you to "Allow Notifications". Click **Allow**.
-3.  Add a new transaction, notice, or comment.
-4.  Other users who have allowed notifications should receive a push notification!
+3.  Check the browser console (F12) for logs like `FCM Token generated` and `FCM Token saved to Firestore`.
+4.  Add a new transaction, notice, or comment.
+5.  Other users who have allowed notifications should receive a push notification!

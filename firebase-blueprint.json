@@ -50,6 +50,17 @@
       },
       "required": ["title", "content", "createdBy", "createdAt"]
     },
+    "FCMToken": {
+      "title": "FCM Token",
+      "description": "A device token for push notifications.",
+      "type": "object",
+      "properties": {
+        "token": { "type": "string", "description": "The FCM registration token." },
+        "flatNo": { "type": "string", "description": "The flat number associated with the token." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "When the token was last updated." }
+      },
+      "required": ["token", "flatNo", "updatedAt"]
+    },
     "categories": {
       "title": "Category",
       "description": "Income and expense categories",
@@ -93,6 +104,10 @@
     "/notices/{noticeId}": {
       "schema": "Notice",
       "description": "Collection of notices from admins."
+    },
+    "/fcm_tokens/{tokenId}": {
+      "schema": "FCMToken",
+      "description": "Collection of device tokens for push notifications."
     }
   }
 }
