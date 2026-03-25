@@ -73,7 +73,7 @@ export function CommentsModal({ transactionId, transactionTitle, currentUserFlat
       });
       
       // Trigger notification
-      fetch('/api/notify', {
+      fetch('https://osworker.manthank.com/api/notify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -81,7 +81,7 @@ export function CommentsModal({ transactionId, transactionTitle, currentUserFlat
           message: `${currentUserFlatNo}: ${newComment.trim().substring(0, 50)}${newComment.trim().length > 50 ? '...' : ''}`,
           url: window.location.origin
         })
-      }).catch((err: any) => console.error("Notification error:", err));
+      }).catch((err) => console.error("Notification error:", err));
 
       setNewComment('');
     } catch (error: any) {
