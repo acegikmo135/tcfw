@@ -27,8 +27,7 @@ import {
   signInWithCustomToken,
   User 
 } from 'firebase/auth';
-import { db, auth, messaging, handleFirestoreError, OperationType } from './firebase';
-import { getToken, onMessage } from 'firebase/messaging';
+import { db, auth, handleFirestoreError, OperationType } from './firebase';
 import { 
   LayoutDashboard, 
   PlusCircle, 
@@ -148,59 +147,6 @@ function Dashboard() {
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [isAddingNotice, setIsAddingNotice] = useState(false);
 
-  // FCM Token Registration
-  useEffect(() => {
-    if (!user || !messaging) return;
-
-    const registerFCM = async () => {
-      if (!messaging) return;
-      try {
-        const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY?.trim();
-        if (!vapidKey) {
-          console.warn('FCM VAPID key is missing. Notifications will not be registered.');
-          return;
-        }
-
-        const permission = await Notification.requestPermission();
-        if (permission === 'granted') {
-          // Explicitly register the service worker to ensure it's picked up correctly
-          const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-          
-          const token = await getToken(messaging, {
-            vapidKey: vapidKey,
-            serviceWorkerRegistration: registration
-          });
-          
-          if (token) {
-            console.log('FCM Token generated:', token);
-            // Save token to Firestore
-            await setDoc(doc(db, 'fcm_tokens', user.uid), {
-              token,
-              flatNo: flatInfo?.flatNo || 'unknown',
-              updatedAt: serverTimestamp()
-            });
-            console.log('FCM Token saved to Firestore');
-          } else {
-            console.warn('No FCM token received');
-          }
-        } else {
-          console.warn('Notification permission denied');
-        }
-      } catch (err) {
-        console.error('FCM registration error:', err);
-      }
-    };
-
-    registerFCM();
-
-    // Foreground message listener
-    const unsubscribe = onMessage(messaging, (payload) => {
-      console.log('Foreground message:', payload);
-      // You could show a toast here
-    });
-
-    return () => unsubscribe();
-  }, [user, flatInfo]);
   const [editingNotice, setEditingNotice] = useState<Notice | null>(null);
   const [deletingNoticeId, setDeletingNoticeId] = useState<string | null>(null);
   const [noticeError, setNoticeError] = useState("");
@@ -385,17 +331,6 @@ function Dashboard() {
           createdAt: serverTimestamp(),
           isPinned: false
         });
-        
-        // Trigger notification
-        fetch('/api/notify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: `New Notice: ${title}`,
-            message: content.substring(0, 100) + (content.length > 100 ? '...' : ''),
-            url: window.location.origin
-          })
-        }).catch(err => console.error("Notification error:", err));
       }
       
       setIsAddingNotice(false);
@@ -1314,17 +1249,6 @@ function Dashboard() {
                   setIsAdding(false);
                   try {
                     await addDoc(collection(db, 'transactions'), data);
-                    
-                    // Trigger notification
-                    fetch('/api/notify', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        title: `New ${data.type === 'income' ? 'Income' : 'Expense'}`,
-                        message: `${data.category}: ₹${data.amount} - ${data.description}`,
-                        url: window.location.origin
-                      })
-                    }).catch(err => console.error("Notification error:", err));
                   } catch (error) {
                     handleFirestoreError(error, OperationType.CREATE, 'transactions');
                   }

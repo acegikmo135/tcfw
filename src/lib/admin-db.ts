@@ -29,5 +29,4 @@ if (databaseId && databaseId !== "(default)") {
   adminDb.settings({ databaseId });
 }
 
-export const adminMessaging = admin.messaging();
 export default admin;
