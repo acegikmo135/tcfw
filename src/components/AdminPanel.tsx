@@ -198,7 +198,14 @@ export function AdminPanel() {
       // Create user in Firebase Auth using a secondary app
       const { initializeApp } = await import('firebase/app');
       const { getAuth, createUserWithEmailAndPassword, updateProfile, signOut: signOutSecondary } = await import('firebase/auth');
-      const firebaseConfig = (await import('../../firebase-applet-config.json')).default;
+      const firebaseConfig = {
+        apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+        authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+        projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+        storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+        messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+        appId: import.meta.env.VITE_FIREBASE_APP_ID,
+      };
       
       const secondaryApp = initializeApp(firebaseConfig, "SecondaryApp" + Date.now());
       const secondaryAuth = getAuth(secondaryApp);

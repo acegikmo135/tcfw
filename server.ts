@@ -9,39 +9,32 @@ import fs from "fs";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load firebase config
-const firebaseConfigPath = path.join(process.cwd(), "firebase-applet-config.json");
-const firebaseConfig = JSON.parse(fs.readFileSync(firebaseConfigPath, "utf8"));
-
 // Initialize Firebase Admin
-// Note: In production, you should provide a service account key via environment variable
-// For this environment, we'll try to initialize with the project ID if possible
 if (!admin.apps.length) {
   const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+  const projectId = process.env.VITE_FIREBASE_PROJECT_ID;
+
   if (serviceAccountKey) {
     try {
       const serviceAccount = JSON.parse(serviceAccountKey);
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
-        databaseURL: `https://${firebaseConfig.projectId}.firebaseio.com`
+        databaseURL: `https://${projectId}.firebaseio.com`
       });
     } catch (e) {
       console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY", e);
-      admin.initializeApp({
-        projectId: firebaseConfig.projectId
-      });
+      admin.initializeApp({ projectId });
     }
   } else {
-    admin.initializeApp({
-      projectId: firebaseConfig.projectId
-    });
+    admin.initializeApp({ projectId });
   }
 }
 
 const db = admin.firestore();
-if (firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== "(default)") {
-  // @ts-ignore - databaseId is supported in newer versions of firebase-admin
-  db.settings({ databaseId: firebaseConfig.firestoreDatabaseId });
+const databaseId = process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID;
+if (databaseId && databaseId !== "(default)") {
+  // @ts-ignore
+  db.settings({ databaseId });
 }
 
 async function startServer() {
@@ -50,6 +43,58 @@ async function startServer() {
 
   app.use(express.json());
   app.use(cookieParser());
+
+  // FCM Notification Endpoint
+  app.post("/api/notify", async (req, res) => {
+    const { title, message, url } = req.body;
+    
+    try {
+      // Get all FCM tokens from Firestore
+      const tokensSnapshot = await db.collection("fcm_tokens").get();
+      const tokens = tokensSnapshot.docs.map(doc => doc.data().token);
+
+      if (tokens.length === 0) {
+        return res.json({ success: true, message: "No tokens found" });
+      }
+
+      const payload = {
+        notification: {
+          title,
+          body: message,
+        },
+        webpush: {
+          fcmOptions: {
+            link: url || "/"
+          }
+        },
+        tokens: tokens
+      };
+
+      const response = await admin.messaging().sendEachForMulticast(payload);
+      
+      // Clean up invalid tokens
+      if (response.failureCount > 0) {
+        const failedTokens: string[] = [];
+        response.responses.forEach((resp, idx) => {
+          if (!resp.success) {
+            failedTokens.push(tokens[idx]);
+          }
+        });
+        
+        // Delete failed tokens from Firestore
+        const deletePromises = failedTokens.map(token => 
+          db.collection("fcm_tokens").where("token", "==", token).get()
+            .then(snap => snap.forEach(doc => doc.ref.delete()))
+        );
+        await Promise.all(deletePromises);
+      }
+
+      res.json({ success: true, response });
+    } catch (error) {
+      console.error("FCM Error:", error);
+      res.status(500).json({ success: false, error: String(error) });
+    }
+  });
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {

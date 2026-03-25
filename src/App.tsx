@@ -27,7 +27,8 @@ import {
   signInWithCustomToken,
   User 
 } from 'firebase/auth';
-import { db, auth, handleFirestoreError, OperationType } from './firebase';
+import { db, auth, messaging, handleFirestoreError, OperationType } from './firebase';
+import { getToken, onMessage } from 'firebase/messaging';
 import { 
   LayoutDashboard, 
   PlusCircle, 
@@ -146,6 +147,44 @@ function Dashboard() {
   const [categories, setCategories] = useState<{id: string, name: string, type: string}[]>([]);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [isAddingNotice, setIsAddingNotice] = useState(false);
+
+  // FCM Token Registration
+  useEffect(() => {
+    if (!user || !messaging) return;
+
+    const registerFCM = async () => {
+      if (!messaging) return;
+      try {
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+          const token = await getToken(messaging, {
+            vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY
+          });
+          
+          if (token) {
+            // Save token to Firestore
+            await setDoc(doc(db, 'fcm_tokens', user.uid), {
+              token,
+              flatNo: flatInfo?.flatNo || 'unknown',
+              updatedAt: serverTimestamp()
+            });
+          }
+        }
+      } catch (err) {
+        console.error('FCM registration error:', err);
+      }
+    };
+
+    registerFCM();
+
+    // Foreground message listener
+    const unsubscribe = onMessage(messaging, (payload) => {
+      console.log('Foreground message:', payload);
+      // You could show a toast here
+    });
+
+    return () => unsubscribe();
+  }, [user, flatInfo]);
   const [editingNotice, setEditingNotice] = useState<Notice | null>(null);
   const [deletingNoticeId, setDeletingNoticeId] = useState<string | null>(null);
   const [noticeError, setNoticeError] = useState("");
@@ -322,6 +361,17 @@ function Dashboard() {
           createdAt: serverTimestamp(),
           isPinned: false
         });
+        
+        // Trigger notification
+        fetch('/api/notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: `New Notice: ${title}`,
+            message: content.substring(0, 100) + (content.length > 100 ? '...' : ''),
+            url: window.location.origin
+          })
+        }).catch(err => console.error("Notification error:", err));
       }
       
       setIsAddingNotice(false);
@@ -1234,6 +1284,17 @@ function Dashboard() {
                   setIsAdding(false);
                   try {
                     await addDoc(collection(db, 'transactions'), data);
+                    
+                    // Trigger notification
+                    fetch('/api/notify', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        title: `New ${data.type === 'income' ? 'Income' : 'Expense'}`,
+                        message: `${data.category}: ₹${data.amount} - ${data.description}`,
+                        url: window.location.origin
+                      })
+                    }).catch(err => console.error("Notification error:", err));
                   } catch (error) {
                     handleFirestoreError(error, OperationType.CREATE, 'transactions');
                   }
