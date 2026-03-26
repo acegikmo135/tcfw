@@ -264,7 +264,7 @@ export function AdminPanel() {
         body: JSON.stringify({
           title: `📢 New Notice: ${title}`,
           message: content.substring(0, 120),
-          url: 'https://tcfw.manthank.com',
+          url: window.location.origin,
         }),
       }).catch(console.error);
 
