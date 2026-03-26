@@ -13,16 +13,32 @@
       },
     });
 
-    // Hide bell if already subscribed
-    const isSubscribed = OneSignal.User.PushSubscription.optedIn;
-    if (isSubscribed) {
-      OneSignal.notifyButton.hide();
+    async function hideBellIfSubscribed() {
+      const optedIn = await OneSignal.User.PushSubscription.optedIn;
+      if (optedIn) {
+        const style = document.createElement("style");
+        style.innerHTML = `
+          .onesignal-bell-launcher {
+            display: none !important;
+          }
+        `;
+        document.head.appendChild(style);
+      }
     }
 
-    // Hide bell immediately after subscribing
-    OneSignal.User.PushSubscription.addEventListener("change", function(event) {
-      if (event.current.optedIn) {
-        OneSignal.notifyButton.hide();
+    // Run check
+    hideBellIfSubscribed();
+
+    // Run again if user subscribes later
+    OneSignal.User.PushSubscription.addEventListener("change", function(e) {
+      if (e.current.optedIn) {
+        const style = document.createElement("style");
+        style.innerHTML = `
+          .onesignal-bell-launcher {
+            display: none !important;
+          }
+        `;
+        document.head.appendChild(style);
       }
     });
   });
