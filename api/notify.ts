@@ -1,42 +1,58 @@
-export default async function handler(req: any, res: any) {
+export const config = { runtime: 'edge' };
+
+export default async function handler(req: Request): Promise<Response> {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return new Response('Method not allowed', { status: 405 });
   }
 
   const ONESIGNAL_APP_ID = process.env.VITE_ONESIGNAL_APP_ID;
   const ONESIGNAL_REST_API_KEY = process.env.ONESIGNAL_REST_API_KEY;
 
   if (!ONESIGNAL_APP_ID || !ONESIGNAL_REST_API_KEY) {
-    return res.status(500).json({ error: 'OneSignal not configured' });
+    return new Response(
+      JSON.stringify({ error: 'OneSignal not configured' }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
   }
 
-  const { title, message, url } = req.body || {};
+  let body: { title?: string; message?: string; url?: string } = {};
+  try {
+    body = await req.json();
+  } catch {
+    return new Response(
+      JSON.stringify({ error: 'Invalid JSON body' }),
+      { status: 400, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+
+  const { title, message, url } = body;
 
   if (!title || !message) {
-    return res.status(400).json({ error: 'title and message are required' });
+    return new Response(
+      JSON.stringify({ error: 'title and message are required' }),
+      { status: 400, headers: { 'Content-Type': 'application/json' } }
+    );
   }
 
-  try {
-    const response = await fetch('https://onesignal.com/api/v1/notifications', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Basic ${ONESIGNAL_REST_API_KEY}`,
-      },
-      body: JSON.stringify({
-        app_id: ONESIGNAL_APP_ID,
-        included_segments: ['All'],
-        headings: { en: title },
-        contents: { en: message },
-        url: url || 'https://tcfw.manthank.com',
-        priority: 10,
-        isAnyWeb: true,
-      }),
-    });
+  const response = await fetch('https://onesignal.com/api/v1/notifications', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Basic ${ONESIGNAL_REST_API_KEY}`,
+    },
+    body: JSON.stringify({
+      app_id: ONESIGNAL_APP_ID,
+      included_segments: ['All'],
+      headings: { en: title },
+      contents: { en: message },
+      url: url || 'https://tcfw.manthank.com',
+      priority: 10,
+    }),
+  });
 
-    const data = await response.json();
-    return res.status(response.ok ? 200 : 500).json(data);
-  } catch (error) {
-    return res.status(500).json({ error: String(error) });
-  }
+  const data = await response.json();
+  return new Response(JSON.stringify(data), {
+    status: response.ok ? 200 : 500,
+    headers: { 'Content-Type': 'application/json' },
+  });
 }
