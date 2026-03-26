@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, Timestamp, deleteDoc, doc, updateDoc, increment } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
-import { Trash2, Send, Loader2, X } from 'lucide-react';
+import { Trash2, Send, Loader as Loader2, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';

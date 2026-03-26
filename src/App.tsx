@@ -28,32 +28,7 @@ import {
   User 
 } from 'firebase/auth';
 import { db, auth, handleFirestoreError, OperationType } from './firebase';
-import { 
-  LayoutDashboard, 
-  PlusCircle, 
-  LogOut, 
-  Bell,
-  Pin,
-  Edit2,
-  X,
-  TrendingUp,
-  TrendingDown,
-  Wrench,
-  Zap,
-  Shield,
-  Trash2,
-  Building2,
-  Lock,
-  User as UserIcon,
-  Loader2,
-  AlertCircle,
-  Download,
-  Search,
-  Filter,
-  Eye,
-  EyeOff,
-  Smartphone
-} from 'lucide-react';
+import { LayoutDashboard, CirclePlus as PlusCircle, LogOut, Bell, Pin, CreditCard as Edit2, X, TrendingUp, TrendingDown, Wrench, Zap, Shield, Trash2, Building2, Lock, User as UserIcon, Loader as Loader2, CircleAlert as AlertCircle, Download, Search, ListFilter as Filter, Eye, EyeOff, Smartphone } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { 

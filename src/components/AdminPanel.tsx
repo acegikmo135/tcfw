@@ -19,18 +19,7 @@ import {
   createUserWithEmailAndPassword,
   User 
 } from 'firebase/auth';
-import { 
-  Users, 
-  Plus, 
-  Trash2, 
-  Shield, 
-  LogOut, 
-  Lock,
-  ArrowLeft,
-  Loader2,
-  TrendingUp,
-  TrendingDown
-} from 'lucide-react';
+import { Users, Plus, Trash2, Shield, LogOut, Lock, ArrowLeft, Loader as Loader2, TrendingUp, TrendingDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
