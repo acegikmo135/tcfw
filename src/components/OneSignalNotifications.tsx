@@ -12,6 +12,7 @@ let sdkInitialized = false;
 
 export function initOneSignal(appId: string) {
   if (!appId || sdkInitialized) return;
+  // OneSignal requires HTTPS — skip on local dev
   if (window.location.protocol !== 'https:') return;
   sdkInitialized = true;
 
@@ -33,6 +34,22 @@ export function initOneSignal(appId: string) {
         serviceWorkerParam: { scope: '/' },
         notifyButton: { enable: false },
         welcomeNotification: { disable: true },
+        // Required for Slidedown.promptPush() to render the in-app popup
+        promptOptions: {
+          slidedown: {
+            prompts: [
+              {
+                type: 'push',
+                autoPrompt: false, // we trigger manually via button click
+                text: {
+                  actionMessage: 'Get notified about new transactions, notices, and comments.',
+                  acceptButton: 'Allow',
+                  cancelButton: 'No Thanks',
+                },
+              },
+            ],
+          },
+        },
       });
     } catch (e) {
       console.warn('[OneSignal] Init failed:', e);
@@ -55,13 +72,16 @@ export function OneSignalButton({ className }: { className?: string }) {
   const [status, setStatus] = useState<Status>('loading');
 
   useEffect(() => {
-    if (window.location.protocol !== 'https:' ||
-        !('Notification' in window) ||
-        !('serviceWorker' in navigator)) {
+    if (
+      window.location.protocol !== 'https:' ||
+      !('Notification' in window) ||
+      !('serviceWorker' in navigator)
+    ) {
       setStatus('unsupported');
       return;
     }
 
+    // Poll until OneSignal SDK is ready (max ~9 seconds)
     let attempts = 0;
     const interval = setInterval(() => {
       attempts++;
@@ -88,27 +108,24 @@ export function OneSignalButton({ className }: { className?: string }) {
 
     setStatus('loading');
 
+    // Safety net — never leave button stuck forever
     const safetyTimer = setTimeout(() => {
       setStatus(getOptedIn() === true ? 'subscribed' : 'unsubscribed');
-    }, 30000);
+    }, 60000);
 
     try {
       if (status === 'subscribed') {
         await os.User.PushSubscription.optOut();
         setStatus('unsubscribed');
       } else {
-        // Ask browser for permission, then use OneSignal to complete subscription
-        const permission = await Notification.requestPermission();
-        if (permission === 'granted') {
-          await Promise.race([
-            os.User.PushSubscription.optIn(),
-            new Promise<void>(r => setTimeout(r, 10000)),
-          ]);
-          await new Promise(r => setTimeout(r, 600));
-          setStatus(getOptedIn() === true ? 'subscribed' : 'unsubscribed');
-        } else {
-          setStatus('unsubscribed');
-        }
+        // Trigger OneSignal's in-app slide popup.
+        // force:true bypasses the cooldown so it shows every time the user clicks.
+        // This popup then triggers the browser permission dialog when user clicks Allow.
+        await os.Slidedown.promptPush({ force: true });
+
+        // After the user interacts, give state a moment to settle
+        await new Promise(r => setTimeout(r, 800));
+        setStatus(getOptedIn() === true ? 'subscribed' : 'unsubscribed');
       }
     } catch (e) {
       console.error('[OneSignal]', e);
@@ -146,15 +163,9 @@ export function OneSignalButton({ className }: { className?: string }) {
           status === 'subscribed' ? 'text-green-600' : 'text-gray-400'
         }`}>
           {status === 'subscribed' ? (
-            <>
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              Notifications on
-            </>
+            <><CheckCircle2 className="w-3.5 h-3.5" /> Notifications on</>
           ) : (
-            <>
-              <XCircle className="w-3.5 h-3.5" />
-              Notifications off
-            </>
+            <><XCircle className="w-3.5 h-3.5" /> Notifications off</>
           )}
         </span>
       )}
