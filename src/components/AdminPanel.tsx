@@ -37,6 +37,7 @@ import { twMerge } from 'tailwind-merge';
 
 import { useLanguage } from '../contexts/LanguageContext';
 import { Link } from 'react-router-dom';
+import { sendPushNotification } from '../lib/notifications';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -258,15 +259,11 @@ export function AdminPanel() {
         createdBy: user.email.split('@')[0],
         createdAt: serverTimestamp()
       });
-      fetch('/api/notify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: `📢 New Notice: ${title}`,
-          message: content.substring(0, 120),
-          url: window.location.origin,
-        }),
-      }).catch(console.error);
+      sendPushNotification({
+        title: `📢 New Notice: ${title}`,
+        message: content.substring(0, 120),
+        url: window.location.origin,
+      });
 
       setIsAddingNotice(false);
     } catch (error: any) {

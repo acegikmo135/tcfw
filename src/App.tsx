@@ -82,6 +82,7 @@ import { LanguageProvider, useLanguage } from './contexts/LanguageContext';
 import { motion, AnimatePresence } from 'motion/react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { sendPushNotification } from './lib/notifications';
 
 // --- Utility ---
 function cn(...inputs: ClassValue[]) {
@@ -337,15 +338,11 @@ function Dashboard() {
           createdAt: serverTimestamp(),
           isPinned: false
         });
-        fetch('/api/notify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: `📢 New Notice: ${title}`,
-            message: content.substring(0, 120),
-            url: window.location.origin,
-          }),
-        }).catch(console.error);
+        sendPushNotification({
+          title: `📢 New Notice: ${title}`,
+          message: content.substring(0, 120),
+          url: window.location.origin,
+        });
       }
       
       setIsAddingNotice(false);
@@ -1272,15 +1269,11 @@ function Dashboard() {
                   setIsAdding(false);
                   try {
                     await addDoc(collection(db, 'transactions'), data);
-                    fetch('/api/notify', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        title: `${data.type === 'income' ? '💰 New Income' : '💸 New Expense'}: ${data.category}`,
-                        message: `${data.type === 'income' ? '+' : '-'}₹${data.amount.toLocaleString()} — ${data.description || 'No description'} (by ${data.createdBy})`,
-                        url: window.location.origin,
-                      }),
-                    }).catch(console.error);
+                    sendPushNotification({
+                      title: `${data.type === 'income' ? '💰 New Income' : '💸 New Expense'}: ${data.category}`,
+                      message: `${data.type === 'income' ? '+' : '-'}₹${data.amount.toLocaleString()} — ${data.description || 'No description'} (by ${data.createdBy})`,
+                      url: window.location.origin,
+                    });
                   } catch (error) {
                     handleFirestoreError(error, OperationType.CREATE, 'transactions');
                   }
