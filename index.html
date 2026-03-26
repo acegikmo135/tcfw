@@ -1,6 +1,49 @@
 <!doctype html>
 <html lang="en">
   <head>
+<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+<script>
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  OneSignalDeferred.push(async function(OneSignal) {
+    await OneSignal.init({
+      appId: "9d1c4b2e-71ad-4511-8073-646a535603a3",
+      safari_web_id: "web.onesignal.auto.44e66786-7e94-4ade-8822-3a1650cda83f",
+      serviceWorkerPath: "/OneSignalSDKWorker.js",
+      notifyButton: {
+        enable: true,
+      },
+      allowLocalhostAsSecureOrigin: true,
+    });
+
+    async function hideBellIfSubscribed() {
+      const optedIn = await OneSignal.User.PushSubscription.optedIn;
+      if (optedIn) {
+        const style = document.createElement("style");
+        style.innerHTML = `
+          .onesignal-bell-launcher {
+            display: none !important;
+          }
+        `;
+        document.head.appendChild(style);
+      }
+    }
+
+    hideBellIfSubscribed();
+
+    OneSignal.User.PushSubscription.addEventListener("change", function(e) {
+      if (e.current.optedIn) {
+        const style = document.createElement("style");
+        style.innerHTML = `
+          .onesignal-bell-launcher {
+            display: none !important;
+          }
+        `;
+        document.head.appendChild(style);
+      }
+    });
+  });
+</script>
+
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/jpeg" href="https://raw.githubusercontent.com/acegikmo135/assets/main/vbub4efh.jpg" />

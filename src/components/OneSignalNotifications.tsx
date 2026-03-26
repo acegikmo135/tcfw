@@ -8,54 +8,9 @@ declare global {
   }
 }
 
-let sdkInitialized = false;
-
 export function initOneSignal(appId: string) {
-  if (!appId || sdkInitialized) return;
-  // OneSignal requires HTTPS — skip on local dev
-  if (window.location.protocol !== 'https:') return;
-  sdkInitialized = true;
-
-  window.OneSignalDeferred = window.OneSignalDeferred || [];
-
-  if (!document.getElementById('onesignal-sdk')) {
-    const script = document.createElement('script');
-    script.id = 'onesignal-sdk';
-    script.src = 'https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js';
-    script.defer = true;
-    document.head.appendChild(script);
-  }
-
-  window.OneSignalDeferred.push(async (OneSignal: any) => {
-    try {
-      await OneSignal.init({
-        appId,
-        safari_web_id: "web.onesignal.auto.44e66786-7e94-4ade-8822-3a1650cda83f",
-        serviceWorkerPath: '/OneSignalSDKWorker.js',
-        serviceWorkerParam: { scope: '/' },
-        notifyButton: { enable: true },
-        welcomeNotification: { disable: true },
-        // Required for Slidedown.promptPush() to render the in-app popup
-        promptOptions: {
-          slidedown: {
-            prompts: [
-              {
-                type: 'push',
-                autoPrompt: false, // we trigger manually via button click
-                text: {
-                  actionMessage: 'Get notified about new transactions, notices, and comments.',
-                  acceptButton: 'Allow',
-                  cancelButton: 'No Thanks',
-                },
-              },
-            ],
-          },
-        },
-      });
-    } catch (e) {
-      console.warn('[OneSignal] Init failed:', e);
-    }
-  });
+  // Initialization is now handled in index.html for better bell icon support
+  console.log("OneSignal initialization handled in index.html", { appId });
 }
 
 function getOptedIn(): boolean | null {

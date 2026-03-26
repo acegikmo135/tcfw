@@ -1834,12 +1834,6 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 }
 
 export default function App() {
-  useEffect(() => {
-    const appId = import.meta.env.VITE_ONESIGNAL_APP_ID;
-    console.log("Initializing OneSignal with App ID:", appId ? "Present" : "Missing");
-    if (appId) initOneSignal(appId);
-  }, []);
-
   return (
     <ErrorBoundary>
       <LanguageProvider>
