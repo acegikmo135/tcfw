@@ -32,6 +32,7 @@ export default async function handler(req: Request): Promise<Response> {
   }
 
   const { title, message, url } = body;
+  console.log(`Sending notification: ${title} - ${message}`);
 
   if (!title || !message) {
     return new Response(
@@ -69,6 +70,7 @@ export default async function handler(req: Request): Promise<Response> {
   });
 
   const data = await response.json();
+  console.log(`OneSignal Response (${response.status}):`, JSON.stringify(data));
   return new Response(JSON.stringify(data), {
     status: response.ok ? 200 : response.status,
     headers: { 'Content-Type': 'application/json' },

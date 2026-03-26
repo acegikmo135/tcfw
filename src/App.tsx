@@ -83,6 +83,65 @@ import { motion, AnimatePresence } from 'motion/react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
+// --- Debug Console ---
+function DebugConsole() {
+  const [logs, setLogs] = useState<{msg: string, type: 'log' | 'error', time: string}[]>([]);
+  const [isOpen, setIsOpen] = useState(false);
+
+  useEffect(() => {
+    const originalLog = console.log;
+    const originalError = console.error;
+
+    console.log = (...args) => {
+      setLogs(prev => [...prev.slice(-19), {
+        msg: args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '),
+        type: 'log',
+        time: new Date().toLocaleTimeString()
+      }]);
+      originalLog.apply(console, args);
+    };
+
+    console.error = (...args) => {
+      setLogs(prev => [...prev.slice(-19), {
+        msg: args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '),
+        type: 'error',
+        time: new Date().toLocaleTimeString()
+      }]);
+      originalError.apply(console, args);
+    };
+
+    return () => {
+      console.log = originalLog;
+      console.error = originalError;
+    };
+  }, []);
+
+  if (!isOpen) {
+    return (
+      <button
+        onClick={() => setIsOpen(true)}
+        className="fixed bottom-4 right-4 z-[9999] bg-black/80 text-white p-2 rounded-full text-[10px] font-mono"
+      >
+        Logs
+      </button>
+    );
+  }
+
+  return (
+    <div className="fixed bottom-0 left-0 right-0 z-[9999] bg-black/90 text-white p-4 font-mono text-[10px] max-h-[30vh] overflow-y-auto">
+      <div className="flex justify-between mb-2">
+        <span>Debug Console</span>
+        <button onClick={() => setIsOpen(false)}>Close</button>
+      </div>
+      {logs.map((log, i) => (
+        <div key={i} className={cn("mb-1", log.type === 'error' ? "text-red-400" : "text-green-400")}>
+          [{log.time}] {log.msg}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // --- Utility ---
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -340,6 +399,9 @@ function Dashboard() {
             message: content.substring(0, 120),
             url: window.location.origin,
           }),
+        }).then(async res => {
+          const data = await res.json();
+          console.log("Notice Notification Status:", res.status, data);
         }).catch(console.error);
       }
       
@@ -1275,6 +1337,9 @@ function Dashboard() {
                         message: `${data.type === 'income' ? '+' : '-'}₹${data.amount.toLocaleString()} — ${data.description || 'No description'} (by ${data.createdBy})`,
                         url: window.location.origin,
                       }),
+                    }).then(async res => {
+                      const dataRes = await res.json();
+                      console.log("Transaction Notification Status:", res.status, dataRes);
                     }).catch(console.error);
                   } catch (error) {
                     handleFirestoreError(error, OperationType.CREATE, 'transactions');
@@ -1771,6 +1836,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 export default function App() {
   useEffect(() => {
     const appId = import.meta.env.VITE_ONESIGNAL_APP_ID;
+    console.log("Initializing OneSignal with App ID:", appId ? "Present" : "Missing");
     if (appId) initOneSignal(appId);
   }, []);
 
@@ -1784,6 +1850,7 @@ export default function App() {
             <Route path="/profile" element={<Profile />} />
           </Routes>
         </BrowserRouter>
+        <DebugConsole />
       </LanguageProvider>
     </ErrorBoundary>
   );

@@ -266,6 +266,9 @@ export function AdminPanel() {
           message: content.substring(0, 120),
           url: window.location.origin,
         }),
+      }).then(async res => {
+        const data = await res.json();
+        console.log("Admin Notice Notification Status:", res.status, data);
       }).catch(console.error);
 
       setIsAddingNotice(false);

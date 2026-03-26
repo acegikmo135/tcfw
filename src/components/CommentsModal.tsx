@@ -81,6 +81,9 @@ export function CommentsModal({ transactionId, transactionTitle, currentUserFlat
           message: `${currentUserFlatNo}: ${newComment.trim().substring(0, 50)}${newComment.trim().length > 50 ? '...' : ''}`,
           url: window.location.origin
         })
+      }).then(async res => {
+        const data = await res.json();
+        console.log("Comment Notification Status:", res.status, data);
       }).catch((err) => console.error("Notification error:", err));
 
       setNewComment('');
