@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Bell, BellOff, Loader2 } from 'lucide-react';
+import { Bell, BellOff, Loader2, CheckCircle2, XCircle } from 'lucide-react';
 
 declare global {
   interface Window {
@@ -12,7 +12,6 @@ let sdkInitialized = false;
 
 export function initOneSignal(appId: string) {
   if (!appId || sdkInitialized) return;
-  // OneSignal requires HTTPS and a configured domain — skip on localhost/dev
   if (window.location.protocol !== 'https:') return;
   sdkInitialized = true;
 
@@ -50,33 +49,30 @@ function getOptedIn(): boolean | null {
   }
 }
 
+type Status = 'loading' | 'subscribed' | 'unsubscribed' | 'unsupported';
+
 export function OneSignalButton({ className }: { className?: string }) {
-  const [status, setStatus] = useState<'loading' | 'subscribed' | 'unsubscribed' | 'unsupported'>('loading');
+  const [status, setStatus] = useState<Status>('loading');
 
   useEffect(() => {
-    // Not on HTTPS — notifications won't work
-    if (window.location.protocol !== 'https:') {
-      setStatus('unsupported');
-      return;
-    }
-    if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+    if (window.location.protocol !== 'https:' ||
+        !('Notification' in window) ||
+        !('serviceWorker' in navigator)) {
       setStatus('unsupported');
       return;
     }
 
-    // Poll for OneSignal to finish loading, max ~8 seconds
     let attempts = 0;
     const interval = setInterval(() => {
       attempts++;
-      const OneSignal = window.OneSignal;
-      if (OneSignal) {
+      const os = window.OneSignal;
+      if (os) {
         clearInterval(interval);
         const opted = getOptedIn();
         setStatus(opted === true ? 'subscribed' : 'unsubscribed');
         return;
       }
-      if (attempts >= 26) {
-        // SDK failed to load (wrong domain, blocked, etc.) — hide button
+      if (attempts >= 30) {
         clearInterval(interval);
         setStatus('unsupported');
       }
@@ -87,41 +83,36 @@ export function OneSignalButton({ className }: { className?: string }) {
 
   const handleClick = async () => {
     if (status === 'loading' || status === 'unsupported') return;
-
-    const OneSignal = window.OneSignal;
-    if (!OneSignal) return;
+    const os = window.OneSignal;
+    if (!os) return;
 
     setStatus('loading');
 
-    // Never leave the button stuck — always resolve within 20s
     const safetyTimer = setTimeout(() => {
-      const opted = getOptedIn();
-      setStatus(opted === true ? 'subscribed' : 'unsubscribed');
-    }, 20000);
+      setStatus(getOptedIn() === true ? 'subscribed' : 'unsubscribed');
+    }, 30000);
 
     try {
       if (status === 'subscribed') {
-        await OneSignal.User.PushSubscription.optOut();
+        await os.User.PushSubscription.optOut();
         setStatus('unsubscribed');
       } else {
-        // Request browser permission directly (most reliable cross-browser)
+        // Ask browser for permission, then use OneSignal to complete subscription
         const permission = await Notification.requestPermission();
         if (permission === 'granted') {
-          // Subscribe via OneSignal with a 6-second timeout
           await Promise.race([
-            OneSignal.User.PushSubscription.optIn(),
-            new Promise<void>(resolve => setTimeout(resolve, 6000)),
+            os.User.PushSubscription.optIn(),
+            new Promise<void>(r => setTimeout(r, 10000)),
           ]);
-          const opted = getOptedIn();
-          setStatus(opted === true ? 'subscribed' : 'unsubscribed');
+          await new Promise(r => setTimeout(r, 600));
+          setStatus(getOptedIn() === true ? 'subscribed' : 'unsubscribed');
         } else {
           setStatus('unsubscribed');
         }
       }
     } catch (e) {
-      console.error('OneSignal error:', e);
-      const opted = getOptedIn();
-      setStatus(opted === true ? 'subscribed' : 'unsubscribed');
+      console.error('[OneSignal]', e);
+      setStatus(getOptedIn() === true ? 'subscribed' : 'unsubscribed');
     } finally {
       clearTimeout(safetyTimer);
     }
@@ -130,23 +121,43 @@ export function OneSignalButton({ className }: { className?: string }) {
   if (status === 'unsupported') return null;
 
   return (
-    <button
-      onClick={handleClick}
-      disabled={status === 'loading'}
-      className={className}
-    >
-      {status === 'loading' ? (
-        <Loader2 className="w-5 h-5 animate-spin" />
-      ) : status === 'subscribed' ? (
-        <BellOff className="w-5 h-5" />
-      ) : (
-        <Bell className="w-5 h-5" />
+    <div className="flex flex-col items-start gap-1.5">
+      <button
+        onClick={handleClick}
+        disabled={status === 'loading'}
+        className={className}
+      >
+        {status === 'loading' ? (
+          <Loader2 className="w-5 h-5 animate-spin" />
+        ) : status === 'subscribed' ? (
+          <BellOff className="w-5 h-5" />
+        ) : (
+          <Bell className="w-5 h-5" />
+        )}
+        {status === 'loading'
+          ? 'Please wait...'
+          : status === 'subscribed'
+          ? 'Mute Notifications'
+          : 'Enable Notifications'}
+      </button>
+
+      {status !== 'loading' && (
+        <span className={`flex items-center gap-1 text-xs font-medium ${
+          status === 'subscribed' ? 'text-green-600' : 'text-gray-400'
+        }`}>
+          {status === 'subscribed' ? (
+            <>
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              Notifications on
+            </>
+          ) : (
+            <>
+              <XCircle className="w-3.5 h-3.5" />
+              Notifications off
+            </>
+          )}
+        </span>
       )}
-      {status === 'loading'
-        ? 'Please wait...'
-        : status === 'subscribed'
-        ? 'Mute Notifications'
-        : 'Enable Notifications'}
-    </button>
+    </div>
   );
 }

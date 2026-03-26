@@ -337,7 +337,7 @@ function Dashboard() {
           createdAt: serverTimestamp(),
           isPinned: false
         });
-        fetch('https://osworker.manthank.com/api/notify', {
+        fetch('/api/notify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1272,7 +1272,7 @@ function Dashboard() {
                   setIsAdding(false);
                   try {
                     await addDoc(collection(db, 'transactions'), data);
-                    fetch('https://osworker.manthank.com/api/notify', {
+                    fetch('/api/notify', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({

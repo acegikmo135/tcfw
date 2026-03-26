@@ -73,7 +73,7 @@ export function CommentsModal({ transactionId, transactionTitle, currentUserFlat
       });
       
       // Trigger notification
-      fetch('https://osworker.manthank.com/api/notify', {
+      fetch('/api/notify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

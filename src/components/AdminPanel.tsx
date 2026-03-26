@@ -258,7 +258,7 @@ export function AdminPanel() {
         createdBy: user.email.split('@')[0],
         createdAt: serverTimestamp()
       });
-      fetch('https://osworker.manthank.com/api/notify', {
+      fetch('/api/notify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
