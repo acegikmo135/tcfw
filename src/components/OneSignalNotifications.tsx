@@ -30,9 +30,10 @@ export function initOneSignal(appId: string) {
     try {
       await OneSignal.init({
         appId,
+        safari_web_id: "web.onesignal.auto.44e66786-7e94-4ade-8822-3a1650cda83f",
         serviceWorkerPath: '/OneSignalSDKWorker.js',
         serviceWorkerParam: { scope: '/' },
-        notifyButton: { enable: false },
+        notifyButton: { enable: true },
         welcomeNotification: { disable: true },
         // Required for Slidedown.promptPush() to render the in-app popup
         promptOptions: {

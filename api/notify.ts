@@ -55,6 +55,15 @@ export default async function handler(req: Request): Promise<Response> {
       contents: { en: message },
       url: url || origin,
       isAnyWeb: true,
+      isSafari: true,
+      web_buttons: [
+        {
+          id: 'view-details',
+          text: 'View Details',
+          icon: '',
+          url: url || origin,
+        },
+      ],
       priority: 10,
     }),
   });
