@@ -12,8 +12,22 @@
         enable: true,
       },
     });
+
+    // Hide bell if already subscribed
+    const isSubscribed = OneSignal.User.PushSubscription.optedIn;
+    if (isSubscribed) {
+      OneSignal.notifyButton.hide();
+    }
+
+    // Hide bell immediately after subscribing
+    OneSignal.User.PushSubscription.addEventListener("change", function(event) {
+      if (event.current.optedIn) {
+        OneSignal.notifyButton.hide();
+      }
+    });
   });
 </script>
+
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/jpeg" href="https://raw.githubusercontent.com/acegikmo135/assets/main/vbub4efh.jpg" />
@@ -26,4 +40,3 @@
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-
