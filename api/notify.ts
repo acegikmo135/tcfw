@@ -5,12 +5,18 @@ export default async function handler(req: Request): Promise<Response> {
     return new Response('Method not allowed', { status: 405 });
   }
 
-  const ONESIGNAL_APP_ID = process.env.VITE_ONESIGNAL_APP_ID;
-  const ONESIGNAL_REST_API_KEY = process.env.ONESIGNAL_REST_API_KEY;
+  const ONESIGNAL_APP_ID = process.env.VITE_ONESIGNAL_APP_ID || process.env.ONESIGNAL_APP_ID;
+  const ONESIGNAL_REST_API_KEY = process.env.ONESIGNAL_REST_API_KEY || process.env.VITE_ONESIGNAL_REST_API_KEY;
 
   if (!ONESIGNAL_APP_ID || !ONESIGNAL_REST_API_KEY) {
     return new Response(
-      JSON.stringify({ error: 'OneSignal not configured' }),
+      JSON.stringify({
+        error: 'OneSignal not configured',
+        details: {
+          app_id_present: !!ONESIGNAL_APP_ID,
+          api_key_present: !!ONESIGNAL_REST_API_KEY
+        }
+      }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
@@ -34,6 +40,8 @@ export default async function handler(req: Request): Promise<Response> {
     );
   }
 
+  const origin = req.headers.get('origin') || 'https://tcfw.manthank.com';
+
   const response = await fetch('https://onesignal.com/api/v1/notifications', {
     method: 'POST',
     headers: {
@@ -45,14 +53,15 @@ export default async function handler(req: Request): Promise<Response> {
       included_segments: ['All'],
       headings: { en: title },
       contents: { en: message },
-      url: url || 'https://tcfw.manthank.com',
+      url: url || origin,
+      isAnyWeb: true,
       priority: 10,
     }),
   });
 
   const data = await response.json();
   return new Response(JSON.stringify(data), {
-    status: response.ok ? 200 : 500,
+    status: response.ok ? 200 : response.status,
     headers: { 'Content-Type': 'application/json' },
   });
 }

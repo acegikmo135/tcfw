@@ -161,11 +161,6 @@ function Dashboard() {
   const navigate = useNavigate();
   const { t, language, setLanguage } = useLanguage();
 
-  useEffect(() => {
-    const appId = import.meta.env.VITE_ONESIGNAL_APP_ID;
-    if (appId) initOneSignal(appId);
-  }, []);
-
   const years = useMemo(() => {
     const uniqueYears = new Set<number>();
     transactions.forEach(tx => {
@@ -1774,6 +1769,11 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 }
 
 export default function App() {
+  useEffect(() => {
+    const appId = import.meta.env.VITE_ONESIGNAL_APP_ID;
+    if (appId) initOneSignal(appId);
+  }, []);
+
   return (
     <ErrorBoundary>
       <LanguageProvider>

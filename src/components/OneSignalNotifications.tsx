@@ -30,7 +30,7 @@ export function initOneSignal(appId: string) {
     try {
       await OneSignal.init({
         appId,
-        serviceWorkerPath: 'OneSignalSDKWorker.js',
+        serviceWorkerPath: '/OneSignalSDKWorker.js',
         serviceWorkerParam: { scope: '/' },
         notifyButton: { enable: false },
         welcomeNotification: { disable: true },
