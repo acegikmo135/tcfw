@@ -12,6 +12,8 @@ let sdkInitialized = false;
 
 export function initOneSignal(appId: string) {
   if (!appId || sdkInitialized) return;
+  // OneSignal requires HTTPS and a configured domain — skip on localhost/dev
+  if (window.location.protocol !== 'https:') return;
   sdkInitialized = true;
 
   window.OneSignalDeferred = window.OneSignalDeferred || [];
@@ -25,21 +27,17 @@ export function initOneSignal(appId: string) {
   }
 
   window.OneSignalDeferred.push(async (OneSignal: any) => {
-    await OneSignal.init({
-      appId,
-      serviceWorkerPath: 'OneSignalSDKWorker.js',
-      serviceWorkerParam: { scope: '/' },
-      notifyButton: { enable: false },
-      welcomeNotification: { disable: true },
-      promptOptions: {
-        slidedown: {
-          enabled: true,
-          actionMessage: 'Enable notifications to stay updated on transactions, notices, and comments.',
-          acceptButtonText: 'Allow',
-          cancelButtonText: 'No thanks',
-        },
-      },
-    });
+    try {
+      await OneSignal.init({
+        appId,
+        serviceWorkerPath: 'OneSignalSDKWorker.js',
+        serviceWorkerParam: { scope: '/' },
+        notifyButton: { enable: false },
+        welcomeNotification: { disable: true },
+      });
+    } catch (e) {
+      console.warn('[OneSignal] Init failed:', e);
+    }
   });
 }
 
@@ -56,18 +54,32 @@ export function OneSignalButton({ className }: { className?: string }) {
   const [status, setStatus] = useState<'loading' | 'subscribed' | 'unsubscribed' | 'unsupported'>('loading');
 
   useEffect(() => {
+    // Not on HTTPS — notifications won't work
+    if (window.location.protocol !== 'https:') {
+      setStatus('unsupported');
+      return;
+    }
     if (!('Notification' in window) || !('serviceWorker' in navigator)) {
       setStatus('unsupported');
       return;
     }
 
-    // Poll until OneSignal SDK is ready, then read subscription state
+    // Poll for OneSignal to finish loading, max ~8 seconds
+    let attempts = 0;
     const interval = setInterval(() => {
+      attempts++;
       const OneSignal = window.OneSignal;
-      if (!OneSignal) return;
-      clearInterval(interval);
-      const opted = getOptedIn();
-      setStatus(opted === true ? 'subscribed' : 'unsubscribed');
+      if (OneSignal) {
+        clearInterval(interval);
+        const opted = getOptedIn();
+        setStatus(opted === true ? 'subscribed' : 'unsubscribed');
+        return;
+      }
+      if (attempts >= 26) {
+        // SDK failed to load (wrong domain, blocked, etc.) — hide button
+        clearInterval(interval);
+        setStatus('unsupported');
+      }
     }, 300);
 
     return () => clearInterval(interval);
@@ -81,7 +93,7 @@ export function OneSignalButton({ className }: { className?: string }) {
 
     setStatus('loading');
 
-    // Safety timeout — never leave button stuck in loading state
+    // Never leave the button stuck — always resolve within 20s
     const safetyTimer = setTimeout(() => {
       const opted = getOptedIn();
       setStatus(opted === true ? 'subscribed' : 'unsubscribed');
@@ -92,14 +104,19 @@ export function OneSignalButton({ className }: { className?: string }) {
         await OneSignal.User.PushSubscription.optOut();
         setStatus('unsubscribed');
       } else {
-        // Let OneSignal show its own slide prompt (in-app popup),
-        // which then triggers the browser permission dialog.
-        await OneSignal.Slidedown.promptPush();
-
-        // Wait a moment for the subscription state to settle after user acts
-        await new Promise(r => setTimeout(r, 800));
-        const opted = getOptedIn();
-        setStatus(opted === true ? 'subscribed' : 'unsubscribed');
+        // Request browser permission directly (most reliable cross-browser)
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+          // Subscribe via OneSignal with a 6-second timeout
+          await Promise.race([
+            OneSignal.User.PushSubscription.optIn(),
+            new Promise<void>(resolve => setTimeout(resolve, 6000)),
+          ]);
+          const opted = getOptedIn();
+          setStatus(opted === true ? 'subscribed' : 'unsubscribed');
+        } else {
+          setStatus('unsubscribed');
+        }
       }
     } catch (e) {
       console.error('OneSignal error:', e);
